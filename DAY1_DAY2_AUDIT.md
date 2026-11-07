@@ -140,10 +140,10 @@ Final status is based on the completed source review and the checks listed below
 | D1-22 | PASS | Final `npm run lint` and `npm run build` both passed (E2). |
 | D1-23 | PARTIAL | Axios is configured for the real backend and pages use real APIs; no browser-to-backend interaction test was run (E2, E7). |
 | D1-24–D1-25 | PASS | Frontend requests use API responses and loading/error states; no fake financial records or success fallback was found in the reviewed dashboard flow (E7). |
-| D1-26–D1-28 | PASS | README, threat register, and dated prompt record updated to describe actual work, limitations, and verification; no commit link/result is claimed before the Git outcome is known (E8). |
+| D1-26–D1-28 | PASS | README, threat register, and dated prompt record updated to describe actual work, limitations, verification, and the real commit link (E8). |
 | D1-29–D1-30 | PASS | Git repository is initialized and `origin` points to `humeratasleem-sd/LedgerLine` (E9). |
 | D1-31 | PASS | Audit changes and the pre-existing uncommitted Day 2 work were committed as recorded in E9. |
-| D1-32 | PARTIAL | Push attempt and remote result are recorded in E9; if rejected/unavailable, user credentials or remote access are required. |
+| D1-32 | PASS | Push to `origin main` succeeded; `git ls-remote` confirmed the pushed commit (E9). |
 
 ### Day 2 final checklist (67)
 
@@ -164,23 +164,22 @@ Final status is based on the completed source review and the checks listed below
 - **E2 — Frontend build:** From `frontend`, `npm run lint` passed; `npm run build` passed (Vite production build).
 - **E3 — Database:** MySQL service was running and TCP port 3306 responded, but `LEDGERLINE_DB_USERNAME` and `LEDGERLINE_DB_PASSWORD` were unset. No DB login, migration, Hibernate validation against MySQL, or MySQL-backed startup is claimed.
 - **E4 — Schema source:** V1 declares users, accounts, account permissions, ledger transactions, ledger entries, idempotency keys, audit events, constraints/indexes, and append-only ledger/audit triggers; V2 adds user profile/status; V3 renames `ledger_transactions` to `transactions`. Source inspection is not migration execution.
-- **E5 — Configuration/secrets:** DB/JWT settings are environment-backed; `.env.example` contains placeholders. `git ls-files '*env*'` found only the frontend example among tracked env files; no actual runtime credentials were configured.
+- **E5 — Configuration/secrets:** DB/JWT settings are environment-backed; both committed `.env.example` files contain placeholders. No actual runtime DB/JWT credentials were configured.
 - **E6 — Health:** Running H2-backed Spring Boot process responded `200` with `{"status":"UP"}` from `/actuator/health`. The temporary process was stopped after this check.
 - **E7 — Frontend scope:** Pages and Axios interceptor are wired to actual API calls; frontend compilation/lint is verified. Browser UI, routing/interceptor interaction, and live MySQL integration were not exercised.
-- **E8 — Documentation:** `README.md`, `THREATS.md`, `PROMPTS.md`, and this report reflect actual implementation and known gaps. PROMPTS records the actual test-run correction and no fabricated commit link.
-- **E9 — Git:** Repository: `humeratasleem-sd/LedgerLine`; branch and commit/push results are recorded below after the Git operation.
+- **E8 — Documentation:** `README.md`, `THREATS.md`, `PROMPTS.md`, and this report reflect actual implementation and known gaps. PROMPTS records the actual test-run correction and the real commit link.
+- **E9 — Git:** Repository `humeratasleem-sd/LedgerLine`, branch `main`; commit [`a87ed00ba99d68a50b3bf9250d003bb641ae392e`](https://github.com/humeratasleem-sd/LedgerLine/commit/a87ed00ba99d68a50b3bf9250d003bb641ae392e) was pushed successfully. `git ls-remote origin refs/heads/main` returned the same SHA.
 - **E10 — Security tests:** The passing 40-test Maven suite contains auth/service, JWT/security, bootstrap, account-authorization, and 22 authorization-endpoint integration tests. These establish tested API behavior on H2, not MySQL behavior or financial integrity.
 
 ### Final totals
 
-- **Day 1:** 32 requirements — 19 PASS, 0 FAIL, 13 PARTIAL.
+- **Day 1:** 32 requirements — 20 PASS, 0 FAIL, 12 PARTIAL.
 - **Day 2:** 67 requirements — 58 PASS, 0 FAIL, 9 PARTIAL.
-- **Overall:** 99 requirements — 77 PASS, 0 FAIL, 22 PARTIAL.
+- **Overall:** 99 requirements — 78 PASS, 0 FAIL, 21 PARTIAL.
 
 ### Remaining manual tasks
 
 1. Provide access to a disposable MySQL 8.0.16+ database and its application username/password; run Flyway V1–V3, confirm Hibernate schema validation, and check health against that MySQL-backed process.
 2. Verify production DB/JWT secret provisioning and run the gated initial ADMIN bootstrap only in the intended environment; disable the flag and clear the bootstrap password afterward.
 3. Perform frontend browser smoke tests for registration/login, protected and role-filtered navigation, logout, and 401/403 behavior.
-4. If the push was not accepted, provide authorized GitHub push access and retry a normal (non-force) push.
-5. Add role-aware admin UI and future transaction/statement capabilities only after defining and testing financial integrity, idempotency, rollback, and concurrency invariants. Day 3 and money movement were not implemented.
+4. Add role-aware admin UI and future transaction/statement capabilities only after defining and testing financial integrity, idempotency, rollback, and concurrency invariants. Day 3 and money movement were not implemented.

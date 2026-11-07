@@ -102,7 +102,7 @@ Provision and connect a MySQL test database, apply both migrations, validate Hib
 - `npm run lint` — passed.
 - `npm run build` — passed.
 - The final MySQL-backed startup/migration/health check remains blocked because DB credentials are not configured. The schema/migrations are inspectable source, not a successful migration result.
-- Git commit/push outcomes are recorded in the final audit report after the repository action is attempted. No fabricated commit link is included.
+- Commit [`a87ed00ba99d68a50b3bf9250d003bb641ae392e`](https://github.com/humeratasleem-sd/LedgerLine/commit/a87ed00ba99d68a50b3bf9250d003bb641ae392e) was pushed to `main`; the remote branch was checked with `git ls-remote`.
 
 ### Remaining
 Configure a disposable MySQL database and credentials, run Flyway V1–V3 and Hibernate validation, and obtain a live health response. Review/perform the protected first-admin bootstrap only in the intended environment and clear its bootstrap password immediately afterward. No money movement was added.
