@@ -65,6 +65,10 @@ Start the backend from the repository root:
 
 Flyway applies V1 through V3 during startup. The database, DB username/password, and a valid Base64 JWT secret (at least 32 decoded bytes) are required. Startup intentionally does not fall back to default credentials or a weak signing key. Hibernate validates the migrated schema and does not update it.
 
+For migration verification, use a newly created, disposable MySQL 8.0.16+ database and a restricted user scoped only to that database. Never point this check at production or a database containing user data. Confirm `SELECT VERSION()`, start the application against the disposable schema, then inspect `flyway_schema_history` and `information_schema.tables` and request `/actuator/health`. Verify V1–V3 and the `transactions` table before treating migrations as applied.
+
+MySQL DDL is not generally transactional across all statements in a migration. If a migration fails, do not assume Flyway rolled back every earlier DDL statement. Stop the app, inspect the disposable schema and `flyway_schema_history`, and restore/recreate only that disposable schema before retrying. Do not run `flyway clean` or destructive cleanup against production. A failed-migration recovery test has not yet been run in this environment.
+
 For the first deployment only, enable the guarded administrator bootstrap before starting:
 
 ```powershell
@@ -75,7 +79,18 @@ $secureAdminPassword = Read-Host "Initial administrator password" -AsSecureStrin
 $env:LEDGERLINE_ADMIN_BOOTSTRAP_PASSWORD = [System.Net.NetworkCredential]::new("", $secureAdminPassword).Password
 ```
 
-The bootstrap requires a valid name/email and a password of at least 12 characters (at most 72 UTF-8 bytes), runs only when no ADMIN record exists, BCrypt-hashes the password, and records an `ADMIN_BOOTSTRAPPED` audit event. It is not an HTTP endpoint. After the first successful startup, disable it and clear the bootstrap password from the environment. Subsequent role changes require an authenticated ADMIN and are audited.
+The bootstrap bean is absent by default; it is activated only when `LEDGERLINE_ADMIN_BOOTSTRAP_ENABLED=true` is explicitly supplied. It requires a valid name/email and a password of at least 12 characters (at most 72 UTF-8 bytes), creates an administrator only when no ADMIN record exists, BCrypt-hashes the password, and records an `ADMIN_BOOTSTRAPPED` audit event. An existing ADMIN makes it a no-op; an invalid configuration or an email already assigned to a non-admin stops startup. It is not an HTTP endpoint, and the bootstrap code does not log the supplied name, email, or password.
+
+After the first successful startup, stop the application and remove the bootstrap settings from the provisioning shell/service configuration. For the current PowerShell session:
+
+```powershell
+$env:LEDGERLINE_ADMIN_BOOTSTRAP_ENABLED = "false"
+Remove-Item Env:LEDGERLINE_ADMIN_BOOTSTRAP_FULL_NAME -ErrorAction SilentlyContinue
+Remove-Item Env:LEDGERLINE_ADMIN_BOOTSTRAP_EMAIL -ErrorAction SilentlyContinue
+Remove-Item Env:LEDGERLINE_ADMIN_BOOTSTRAP_PASSWORD -ErrorAction SilentlyContinue
+```
+
+In the service manager or deployment secret store, likewise set the flag to `false` or remove it and delete the bootstrap credential values before restarting. The default is disabled if the flag is absent. Subsequent role changes require an authenticated ADMIN and are audited.
 
 Check the health endpoint at `http://localhost:8080/actuator/health`. Health details are hidden. The endpoint is public; application API endpoints are not.
 
@@ -152,12 +167,13 @@ Backend integration tests use H2 with Flyway disabled; migration verification re
 
 Verification run on 2026-11-07:
 
-- `.\mvnw.cmd test` — passed, 40 tests, 0 failures/errors/skips.
+- `.\mvnw.cmd test` — passed, 41 tests, 0 failures/errors/skips.
 - `.\mvnw.cmd compile` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed.
 - `GET /actuator/health` — HTTP 200 with `{"status":"UP"}` from a running H2-backed Spring Boot process; this is not a MySQL health check.
 - Flyway V1–V3 on MySQL — not run. MySQL port reachability alone is not a connection or migration test.
+- Browser smoke — Playwright confirmed the login and registration pages render, empty login submission is blocked by browser validation, unauthenticated `/accounts` redirects to `/login`, and registration remains public after refresh. Auth API operations and role-specific sessions were not testable without MySQL credentials.
 
 ## Known limitations and next work
 

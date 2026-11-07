@@ -106,3 +106,26 @@ Provision and connect a MySQL test database, apply both migrations, validate Hib
 
 ### Remaining
 Configure a disposable MySQL database and credentials, run Flyway V1–V3 and Hibernate validation, and obtain a live health response. Review/perform the protected first-admin bootstrap only in the intended environment and clear its bootstrap password immediately afterward. No money movement was added.
+
+## Entry 5 — Closing verifiable Day 1/Day 2 partials
+
+### Date and request
+2026-11-07. Asked to verify MySQL migrations on a disposable DB, browser-test frontend authentication/authorization, validate the initial-admin bootstrap, review auth/security, update every audit status, and rerun checks without starting Day 3.
+
+### Findings and corrections
+- Confirmed MySQL Community Server 8.0.42 was installed/running and port 3306 answered, but DB username/password and JWT key were unset. Did not guess credentials or touch any database. Reviewed V1–V3 order, MySQL-oriented DDL, table rename, foreign keys, indexes, constraints, and BIGINT paise statically; explicitly did not call static review a migration run.
+- Noticed the prior final audit counted an H2-backed health response as PASS for the requested MySQL health check. Corrected D1-21 to PARTIAL and updated totals and evidence.
+- The prior audit grouped final statuses into ranges. Expanded the final matrix to one row per each of the 99 requirements and added exact manual MySQL/browser verification steps and MySQL DDL failure-recovery caveats.
+- Inspected bootstrap conditions and added `AdminBootstrapConditionTest` loading the real `application.properties`; the default-disabled condition passed. Updated README with the operator shutdown steps and confirmation that bootstrap values are not logged.
+- Opened the actual Vite app with integrated Playwright: login and registration pages rendered, an empty login submit made zero `/api/auth/login` requests, unauthenticated `/accounts`, `/audit`, `/transfers`, `/statements`, and `/profile` redirected to `/login`, and public `/register` remained after refresh. A real login/register request and role-specific authenticated flows could not be tested because the backend cannot connect to MySQL here; no API responses were mocked.
+- Requested the dedicated security-review agent to inspect authentication and authorization. It reported no vulnerabilities; this is not a deployment certification.
+
+### Verification
+- Backend `.\mvnw.cmd compile` — passed.
+- Backend `.\mvnw.cmd test` — passed, **41 tests, 0 failures/errors/skips**. Integration tests use H2 and disable Flyway; they do not prove MySQL compatibility.
+- `npm run lint` and `npm run build` — passed.
+- Playwright guest-page checks passed as listed above. Authenticated browser/API flows remain blocked pending MySQL credentials.
+- Flyway migration execution, Hibernate validation against MySQL, MySQL-backed `/actuator/health`, and failure/repair simulation remain **not run**. No database was altered.
+
+### Remaining
+Provide a disposable MySQL database with scoped credentials, then run V1–V3, inspect the migrated schema/history, verify Hibernate and health, and simulate a failed migration only on a disposable copy. Run authenticated browser checks against that backend using actual test users for each role. No money movement or Day 3 work was added.

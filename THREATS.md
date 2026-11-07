@@ -23,9 +23,10 @@ This register records implemented controls and remaining risks as of 2026-11-07.
 
 ## Verification state
 
-- Backend `mvn test` passed: 40 tests, 0 failures/errors/skips, using an H2 test database with Flyway disabled. Tests cover authentication, role boundaries, guarded admin bootstrap, admin account/user/role management and audit, permission assignment/access, safe profile responses, and health.
+- Backend `mvn test` passed: 41 tests, 0 failures/errors/skips, using an H2 test database with Flyway disabled. Tests cover authentication, role boundaries, default-disabled admin bootstrap, admin account/user/role management and audit, permission assignment/access, safe profile responses, and health.
 - Backend `mvn compile`, frontend `npm run lint`, and `npm run build` passed.
-- MySQL service port 3306 was reachable during the initial audit, but no application DB username/password or JWT key was configured. V1–V3 were not applied; no MySQL schema validation, MySQL-backed startup, or MySQL-backed health response is claimed. A temporary H2-backed backend returned HTTP 200 `{"status":"UP"}` from `/actuator/health`.
+- MySQL Community Server 8.0.42 was installed/running and port 3306 responded, but no application DB username/password or JWT key was configured. V1–V3 were not applied; no MySQL schema validation, MySQL-backed startup, health response, or failed-migration recovery test is claimed.
+- Integrated Playwright checked the unauthenticated login/registration pages, empty-submit validation, `/accounts` redirect to `/login`, and public registration page refresh. No real registration/login, authenticated role navigation, logout, or browser 401/403 flow was testable without the backend database. A dedicated security-review agent reported no vulnerabilities in the reviewed authentication/authorization implementation.
 
 ## Required before any transfer feature
 

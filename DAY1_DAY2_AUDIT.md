@@ -128,58 +128,139 @@ Final status is based on the completed source review and the checks listed below
 
 ### Day 1 final checklist (32)
 
-| Requirement IDs | Final status | Fix, verification and evidence |
+| ID | Final status | Verification/evidence |
 |---|---|---|
-| D1-01–D1-05 | PASS | Project layout, Spring Boot/Maven, Java 25, React/Vite, and Tailwind were inspected; backend compile and frontend lint/build pass (E1–E2). |
-| D1-06 | PARTIAL | MySQL service port was reachable, but DB username/password are unset; no authenticated DB connection (E3). |
-| D1-07–D1-15 | PARTIAL | Flyway V1–V3 and all required tables exist in migration source; added V3 to rename `ledger_transactions` to `transactions`. No MySQL migration was executed, so runtime schema/table existence is unverified (E3). |
-| D1-16–D1-17 | PASS | V1 monetary fields use `BIGINT` paise; source search found no floating-point financial arithmetic (E4). |
-| D1-18 | PARTIAL | SQL constraints, indexes, and append-only triggers were inspected, but not exercised on MySQL (E3–E4). |
-| D1-19–D1-20 | PASS | Runtime DB/JWT settings use environment variables; committed env template contains placeholders only. No configured DB/JWT credentials were present in this process (E5). |
-| D1-21 | PASS | Temporary H2-backed Spring Boot process returned HTTP 200 and `{"status":"UP"}` from `/actuator/health`; this does not verify MySQL health (E6). |
-| D1-22 | PASS | Final `npm run lint` and `npm run build` both passed (E2). |
-| D1-23 | PARTIAL | Axios is configured for the real backend and pages use real APIs; no browser-to-backend interaction test was run (E2, E7). |
-| D1-24–D1-25 | PASS | Frontend requests use API responses and loading/error states; no fake financial records or success fallback was found in the reviewed dashboard flow (E7). |
-| D1-26–D1-28 | PASS | README, threat register, and dated prompt record updated to describe actual work, limitations, verification, and the real commit link (E8). |
-| D1-29–D1-30 | PASS | Git repository is initialized and `origin` points to `humeratasleem-sd/LedgerLine` (E9). |
-| D1-31 | PASS | Audit changes and the pre-existing uncommitted Day 2 work were committed as recorded in E9. |
-| D1-32 | PASS | Push to `origin main` succeeded; `git ls-remote` confirmed the pushed commit (E9). |
+| D1-01 | PASS | Backend, frontend, and documentation folders inspected. |
+| D1-02 | PASS | Spring Boot configuration and application entry point inspected; backend compile passes (E1). |
+| D1-03 | PASS | Java 25/Maven configuration inspected; Maven compile and tests pass (E1). |
+| D1-04 | PASS | React/Vite setup inspected; production build passes (E2). |
+| D1-05 | PASS | Tailwind Vite configuration inspected; production build passes (E2). |
+| D1-06 | PARTIAL | MySQL 8.0.42 service/port is present, but no authenticated database connection (E3). |
+| D1-07 | PARTIAL | Flyway enabled; versioned V1–V3 order and SQL source inspected. No MySQL execution (E4). |
+| D1-08 | PARTIAL | MySQL schema creation not executed; no database was modified (E3–E4). |
+| D1-09 | PARTIAL | `users` declared in V1; runtime existence not verified (E4). |
+| D1-10 | PARTIAL | `accounts` declared in V1; runtime existence not verified (E4). |
+| D1-11 | PARTIAL | `account_permissions` declared in V1; runtime existence not verified (E4). |
+| D1-12 | PARTIAL | V1 creates `ledger_transactions`; V3 source renames it to `transactions`; runtime result not verified (E4). |
+| D1-13 | PARTIAL | `ledger_entries` declared in V1; runtime existence not verified (E4). |
+| D1-14 | PARTIAL | `idempotency_keys` declared in V1; runtime existence not verified (E4). |
+| D1-15 | PARTIAL | `audit_events` declared in V1; runtime existence not verified (E4). |
+| D1-16 | PASS | V1 monetary columns inspected as `BIGINT` paise (E4). |
+| D1-17 | PASS | Source review found no floating-point financial arithmetic (E4). |
+| D1-18 | PARTIAL | Constraints, indexes, and foreign keys inspected in SQL source; not exercised against MySQL (E4). |
+| D1-19 | PASS | Database/JWT/CORS/port values are environment-backed; no secrets configured in this session (E5). |
+| D1-20 | PASS | Env templates contain placeholders; no actual credentials were found in configured environment (E5). |
+| D1-21 | PARTIAL | The requested MySQL-backed health check could not run; prior H2 health is not substituted for it (E3). |
+| D1-22 | PASS | `npm run lint` and `npm run build` pass (E2). |
+| D1-23 | PARTIAL | Browser UI and guest navigation were tested; frontend-to-authenticated-API communication requires unavailable MySQL-backed backend (E7). |
+| D1-24 | PASS | Source uses Axios requests and explicit errors; no fake success response was added (E7). |
+| D1-25 | PASS | No fabricated financial transaction data was added (E7). |
+| D1-26 | PASS | README updated for bootstrap shutdown procedure and current verification limits (E8). |
+| D1-27 | PASS | Threat register distinguishes implemented and outstanding controls; security reviewer reported no vulnerabilities (E8, E13). |
+| D1-28 | PASS | Dated AI development record updated with this phase’s actual results and blockers (E8). |
+| D1-29 | PASS | Git repository initialized and worktree changes are tracked (E9). |
+| D1-30 | PASS | `origin` is configured for the LedgerLine repository (E9). |
+| D1-31 | PASS | Prior work and audit records committed (E9). |
+| D1-32 | PASS | Prior commit push was confirmed on `origin/main` (E9). |
 
 ### Day 2 final checklist (67)
 
-| Requirement IDs | Final status | Fix, verification and evidence |
+| ID | Final status | Verification/evidence |
 |---|---|---|
-| D2-01–D2-28 | PASS | User entity, BCrypt, validation, safe DTOs, role/status security, JWT issue/verify/expiry, stateless filter, 401/403, and all three auth endpoints are implemented; auth, password, JWT, and endpoint tests passed (E1, E10). |
-| D2-29–D2-40 | PASS | Validation error cases were added; HTTP status/error behavior, admin/holder/auditor access, server-side account permissions, cross-user denial, and financial write restrictions are covered by implementation and integration tests (E10). |
-| D2-41–D2-42 | PARTIAL | Login and registration pages call the actual auth APIs and frontend builds; no browser interaction test was run (E2, E7). |
-| D2-43 | PASS | In-memory authentication context implements user/token lifecycle; lint and production build pass (E2). |
-| D2-44–D2-49 | PARTIAL | Protected routes, role navigation, logout and Axios 401/403 handling are implemented, but browser-level behavior was not verified (E2, E7). |
-| D2-50–D2-52 | PASS | Existing dashboard was retained; backend compile and frontend lint/build pass (E1–E2). |
-| D2-53 | PARTIAL | V1–V3 are configured and V3 fixes the table name, but no migration was run against MySQL because credentials are unavailable (E3). |
-| D2-54–D2-67 | PASS | Registration, duplicate email, BCrypt, login, bad password, JWT validity/expiry/tampering, role restrictions, privilege escalation, cross-user access, and invalid API request validation tests pass (E10). |
+| D2-01 | PASS | User entity implements required fields (E10). |
+| D2-02 | PASS | Entity/schema define unique email; tests cover duplicate registration (E10). |
+| D2-03 | PASS | BCrypt password hashing verified by tests (E10). |
+| D2-04 | PASS | Registration validation and password byte-length guard tested (E10). |
+| D2-05 | PASS | Safe profile DTOs exclude password hash; tests pass (E10). |
+| D2-06 | PASS | Admin status-management endpoint and tests pass (E10). |
+| D2-07 | PASS | Duplicate-email rejection tested (E10). |
+| D2-08 | PASS | ADMIN role and route policy tested (E10). |
+| D2-09 | PASS | ACCOUNT_HOLDER role and route policy tested (E10). |
+| D2-10 | PASS | AUDITOR role and read-only route policy tested (E10). |
+| D2-11 | PASS | Public registration assigns ACCOUNT_HOLDER; role-escalation test passes (E10). |
+| D2-12 | PASS | Registration cannot select AUDITOR; role-escalation test passes (E10). |
+| D2-13 | PASS | Default-disabled bean verified by test; bootstrap validates inputs, refuses existing non-admin email, BCrypt-hashes, and audits; no HTTP bootstrap route or credential logging (E11). |
+| D2-14 | PASS | Backend security route rules and role tests pass (E10). |
+| D2-15 | PASS | Signed JWT generation tested (E10). |
+| D2-16 | PASS | HS256 verification tested; security review found no vulnerability (E10, E13). |
+| D2-17 | PASS | Expiration enforcement tested (E10). |
+| D2-18 | PASS | Invalid token rejection tested (E10). |
+| D2-19 | PASS | Expired token rejection tested (E10). |
+| D2-20 | PASS | Spring bearer authentication filter configured; endpoint tests pass (E10). |
+| D2-21 | PASS | Stateless session policy configured and tested (E10). |
+| D2-22 | PASS | BCrypt login and generic credential failure tested (E10). |
+| D2-23 | PASS | 401 path covered by endpoint tests (E10). |
+| D2-24 | PASS | 403 path covered by endpoint tests (E10). |
+| D2-25 | PASS | JWT key is env supplied and rejects invalid/short keys (E10). |
+| D2-26 | PASS | Registration endpoint tested (E10). |
+| D2-27 | PASS | Login endpoint tested (E10). |
+| D2-28 | PASS | Current-user endpoint derives identity from token subject; tests pass (E10). |
+| D2-29 | PASS | Invalid-field request validation is exercised (E10). |
+| D2-30 | PASS | Status codes asserted by integration tests (E10). |
+| D2-31 | PASS | Safe auth and validation errors asserted (E10). |
+| D2-32 | PASS | ADMIN endpoints reject non-admin callers (E10). |
+| D2-33 | PASS | Account access is scoped to the authenticated user’s permission (E10). |
+| D2-34 | PASS | Auditor/admin read authorization tested (E10). |
+| D2-35 | PASS | Account ownership/permission check applied server-side and tested (E10). |
+| D2-36 | PASS | Reusable account authorization service and permission tests pass (E10). |
+| D2-37 | PASS | Server-side authorization enforced in Spring Security/services (E10). |
+| D2-38 | PASS | Auditor and ledger/audit write restrictions tested (E10). |
+| D2-39 | PASS | Cross-user account access denial tested (E10). |
+| D2-40 | PASS | Backend authorization is independent of frontend; endpoint tests pass (E10). |
+| D2-41 | PARTIAL | Login page rendered; Playwright confirmed an empty submit makes zero `/api/auth/login` requests. Real credential validation awaits MySQL-backed service (E7). |
+| D2-42 | PARTIAL | Registration page rendered; actual registration API flow not run because backend DB credentials are unavailable (E7). |
+| D2-43 | PASS | Auth context and in-memory token lifecycle inspected; frontend lint/build pass (E2). |
+| D2-44 | PARTIAL | Playwright verified unauthenticated `/accounts`, `/audit`, `/transfers`, `/statements`, and `/profile` redirect to `/login`; authenticated access and return-after-login remain unverified (E7). |
+| D2-45 | PARTIAL | Role-filtered nav source inspected; ADMIN/ACCOUNT_HOLDER/AUDITOR browser sessions unavailable (E7). |
+| D2-46 | PARTIAL | Logout handler clears in-memory state; browser logout needs a real authenticated session (E7). |
+| D2-47 | PARTIAL | Axios integration source inspected; no real backend browser authentication was possible (E7). |
+| D2-48 | PARTIAL | 401 interceptor/source and backend behavior are covered, but browser 401 flow needs a running auth API (E7). |
+| D2-49 | PARTIAL | 403 interceptor/source and backend behavior are covered, but browser 403 flow needs an authenticated role session (E7). |
+| D2-50 | PASS | Dashboard design retained; frontend production build passes (E2). |
+| D2-51 | PASS | Maven compile passes (E1). |
+| D2-52 | PASS | Vite production build passes (E2). |
+| D2-53 | PARTIAL | V1–V3 source/order inspected; no disposable MySQL credentials, migration run, or failure-recovery test (E3–E4). |
+| D2-54 | PASS | Registration test passes (E10). |
+| D2-55 | PASS | Duplicate registration test passes (E10). |
+| D2-56 | PASS | BCrypt storage test passes (E10). |
+| D2-57 | PASS | Successful login test passes (E10). |
+| D2-58 | PASS | Incorrect password test passes (E10). |
+| D2-59 | PASS | Valid JWT test passes (E10). |
+| D2-60 | PASS | Expired JWT test passes (E10). |
+| D2-61 | PASS | Invalid JWT test passes (E10). |
+| D2-62 | PASS | ADMIN authorization test passes (E10). |
+| D2-63 | PASS | ACCOUNT_HOLDER authorization test passes (E10). |
+| D2-64 | PASS | AUDITOR read-only test passes (E10). |
+| D2-65 | PASS | Privilege escalation test passes (E10). |
+| D2-66 | PASS | Unauthorized account access test passes (E10). |
+| D2-67 | PASS | API validation test passes (E10). |
 
 ### Evidence
 
-- **E1 — Backend build/tests:** From `backend\ledgerline`, `.\mvnw.cmd compile` passed and `.\mvnw.cmd test` passed: **40 tests, 0 failures, 0 errors, 0 skipped**. Integration tests use H2 and explicitly disable Flyway.
+- **E1 — Backend build/tests:** From `backend\ledgerline`, `.\mvnw.cmd compile` passed and `.\mvnw.cmd test` passed: **41 tests, 0 failures, 0 errors, 0 skipped**. Integration tests use H2 and explicitly disable Flyway; they are not MySQL migration evidence.
 - **E2 — Frontend build:** From `frontend`, `npm run lint` passed; `npm run build` passed (Vite production build).
-- **E3 — Database:** MySQL service was running and TCP port 3306 responded, but `LEDGERLINE_DB_USERNAME` and `LEDGERLINE_DB_PASSWORD` were unset. No DB login, migration, Hibernate validation against MySQL, or MySQL-backed startup is claimed.
-- **E4 — Schema source:** V1 declares users, accounts, account permissions, ledger transactions, ledger entries, idempotency keys, audit events, constraints/indexes, and append-only ledger/audit triggers; V2 adds user profile/status; V3 renames `ledger_transactions` to `transactions`. Source inspection is not migration execution.
+- **E3 — Database:** MySQL Community Server 8.0.42 is installed; `MySQL80` is running and TCP port 3306 responds. `LEDGERLINE_DB_USERNAME`, `LEDGERLINE_DB_PASSWORD`, and the JWT key are unset. No DB login, migration, Hibernate validation against MySQL, or MySQL-backed startup is claimed; no production DB was touched.
+- **E4 — Migration/schema source:** Flyway filenames order V1, V2, V3. V1 creates the seven core tables, paise `BIGINT` columns, indexes, unique/check constraints, foreign keys, and ledger/audit triggers. V2 adds `full_name` and checked `account_status`. V3 contains `RENAME TABLE ledger_transactions TO transactions`; MySQL updates foreign-key references for a table rename. Source syntax and references were reviewed against MySQL 8.0.42 features, including enforced CHECK constraints in MySQL 8.0.16+. This is static review only, not a Flyway run. MySQL DDL is not generally all-or-nothing across a multi-statement migration; failure/repair behavior was not executed.
 - **E5 — Configuration/secrets:** DB/JWT settings are environment-backed; both committed `.env.example` files contain placeholders. No actual runtime DB/JWT credentials were configured.
-- **E6 — Health:** Running H2-backed Spring Boot process responded `200` with `{"status":"UP"}` from `/actuator/health`. The temporary process was stopped after this check.
-- **E7 — Frontend scope:** Pages and Axios interceptor are wired to actual API calls; frontend compilation/lint is verified. Browser UI, routing/interceptor interaction, and live MySQL integration were not exercised.
+- **E6 — Health:** No MySQL-backed health check. Earlier H2-backed health returned `200` `{"status":"UP"}`; it is not evidence for the MySQL requirement.
+- **E7 — Browser:** Integrated Playwright opened `/login` and `/register`; an empty login submit made zero `/api/auth/login` requests; unauthenticated `/accounts`, `/audit`, `/transfers`, `/statements`, and `/profile` redirected to `/login`; refreshing `/register` stayed on registration. Login/registration API success/failure, role navigation, logout, authenticated refresh, and actual 401/403 browser flows could not be exercised without the backend/database.
 - **E8 — Documentation:** `README.md`, `THREATS.md`, `PROMPTS.md`, and this report reflect actual implementation and known gaps. PROMPTS records the actual test-run correction and the real commit link.
 - **E9 — Git:** Repository `humeratasleem-sd/LedgerLine`, branch `main`; commit [`a87ed00ba99d68a50b3bf9250d003bb641ae392e`](https://github.com/humeratasleem-sd/LedgerLine/commit/a87ed00ba99d68a50b3bf9250d003bb641ae392e) was pushed successfully. `git ls-remote origin refs/heads/main` returned the same SHA.
-- **E10 — Security tests:** The passing 40-test Maven suite contains auth/service, JWT/security, bootstrap, account-authorization, and 22 authorization-endpoint integration tests. These establish tested API behavior on H2, not MySQL behavior or financial integrity.
+- **E10 — Security tests:** The passing 41-test Maven suite contains auth/service, JWT/security, bootstrap, account-authorization, and authorization-endpoint integration tests. These establish tested API behavior on H2, not MySQL behavior or financial integrity.
+- **E11 — Bootstrap:** `AdminBootstrapConditionTest` loads the real `application.properties` and verifies the bootstrap bean is absent by default. `AdminBootstrapTest` verifies creation only when no ADMIN exists, rejects invalid config/colliding non-admin email, stores BCrypt, and records the audit event. Source inspection confirms there is no bootstrap logger and only generic configuration errors are thrown; credentials are not included in messages.
+- **E12 — Browser and resource limits:** `agent-browser` CLI and Docker are unavailable; integrated Playwright was available. No database credentials were configured, and no existing shared page was provided. Guest-side checks used the actual Vite app, not fake API responses.
+- **E13 — Security review:** A dedicated security-review agent inspected authentication/authorization implementation and reported no vulnerabilities. No independent live deployment, MySQL, or browser security certification is implied.
 
 ### Final totals
 
-- **Day 1:** 32 requirements — 20 PASS, 0 FAIL, 12 PARTIAL.
+- **Day 1:** 32 requirements — 19 PASS, 0 FAIL, 13 PARTIAL.
 - **Day 2:** 67 requirements — 58 PASS, 0 FAIL, 9 PARTIAL.
-- **Overall:** 99 requirements — 78 PASS, 0 FAIL, 21 PARTIAL.
+- **Overall:** 99 requirements — 77 PASS, 0 FAIL, 22 PARTIAL.
 
 ### Remaining manual tasks
 
-1. Provide access to a disposable MySQL 8.0.16+ database and its application username/password; run Flyway V1–V3, confirm Hibernate schema validation, and check health against that MySQL-backed process.
-2. Verify production DB/JWT secret provisioning and run the gated initial ADMIN bootstrap only in the intended environment; disable the flag and clear the bootstrap password afterward.
-3. Perform frontend browser smoke tests for registration/login, protected and role-filtered navigation, logout, and 401/403 behavior.
-4. Add role-aware admin UI and future transaction/statement capabilities only after defining and testing financial integrity, idempotency, rollback, and concurrency invariants. Day 3 and money movement were not implemented.
+1. Provide a disposable MySQL 8.0.16+ schema and its restricted application credentials. Point the application only at that disposable schema, start it to run Flyway V1–V3, verify `flyway_schema_history`, expected tables/constraints and Hibernate validation, and check `/actuator/health`. No production DB credentials or schema should be used.
+2. On a disposable database copy, exercise a deliberately failed migration and record what MySQL/Flyway leaves behind; MySQL DDL is not generally transactional across all migration statements. Do not test failure recovery on production.
+3. Configure and run the backend against the disposable MySQL DB and valid JWT key, then run browser registration/login, invalid credentials, profile, role-specific sessions, logout, refresh, and actual 401/403 checks using real users/API responses.
+4. If the intended deployment needs an initial admin, provide the operator-managed bootstrap credentials, run once, then set the enable flag false/remove it and delete the credential values from the deployment secret store before restart.
+5. Add role-aware admin UI and future transaction/statement capabilities only after defining and testing financial integrity, idempotency, rollback, and concurrency invariants. Day 3 and money movement were not implemented.
