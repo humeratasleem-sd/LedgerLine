@@ -1,0 +1,34 @@
+package com.ledgerline.controller;
+
+import java.util.List;
+
+import com.ledgerline.dto.AccountResponse;
+import com.ledgerline.service.AccountService;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/accounts")
+public class AccountController {
+
+    private final AccountService accountService;
+
+    public AccountController(AccountService accountService) {
+        this.accountService = accountService;
+    }
+
+    @GetMapping
+    public List<AccountResponse> listAccounts(Authentication authentication) {
+        return accountService.listAuthorizedAccounts(authentication);
+    }
+
+    @GetMapping("/{accountId}")
+    public AccountResponse getAccount(
+            Authentication authentication,
+            @PathVariable long accountId) {
+        return accountService.getAuthorizedAccount(authentication, accountId);
+    }
+}

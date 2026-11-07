@@ -50,6 +50,20 @@ class JwtConfigTest {
     }
 
     @Test
+    void decoderRejectsExpiredAndTamperedTokens() {
+        JwtDecoder decoder = decoder();
+        Instant now = Instant.now();
+        String expired = encode(claims(now.minusSeconds(120), now.minusSeconds(60), List.of("ACCOUNT_HOLDER")));
+        String valid = encode(claims(now, now.plusSeconds(60), List.of("ACCOUNT_HOLDER")));
+        int signatureStart = valid.lastIndexOf('.') + 1;
+        char replacement = valid.charAt(signatureStart) == 'A' ? 'B' : 'A';
+        String tampered = valid.substring(0, signatureStart) + replacement + valid.substring(signatureStart + 1);
+
+        assertThrows(JwtException.class, () -> decoder.decode(expired));
+        assertThrows(JwtException.class, () -> decoder.decode(tampered));
+    }
+
+    @Test
     void decoderRejectsSecretsShorterThanThirtyTwoBytes() {
         String shortSecret = Base64.getEncoder().encodeToString(new byte[31]);
 

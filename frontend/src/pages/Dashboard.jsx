@@ -1,24 +1,65 @@
+import { useEffect, useState } from 'react'
 import { ArrowUpRight, CircleHelp, FileClock, Landmark, ScanLine } from 'lucide-react'
-
-const overviewItems = [
-  {
-    label: 'Available balance',
-    detail: 'Connect an account to see a verified balance.',
-    icon: Landmark,
-  },
-  {
-    label: 'Money in',
-    detail: 'Incoming activity will appear when available.',
-    icon: ArrowUpRight,
-  },
-  {
-    label: 'Money out',
-    detail: 'Outgoing activity will appear when available.',
-    icon: FileClock,
-  },
-]
+import { apiClient } from '../services/api.js'
+import { formatPaise, groupBalancesByCurrency } from '../utils/money.js'
 
 function Dashboard() {
+  const [accounts, setAccounts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    apiClient.get('/api/accounts')
+      .then(({ data }) => {
+        if (active) setAccounts(data)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.response?.data?.detail || 'Account data could not be loaded.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const balanceTotals = groupBalancesByCurrency(accounts)
+  const balanceValue = loading
+    ? 'Loading…'
+    : error
+      ? 'Unavailable'
+      : balanceTotals.size === 1
+        ? formatPaise([...balanceTotals.values()][0].toString(), [...balanceTotals.keys()][0])
+        : balanceTotals.size > 1
+          ? 'Multiple currencies'
+          : '—'
+  const overviewItems = [
+    {
+      label: 'Available balance',
+      value: balanceValue,
+      detail: error
+        ? error
+        : accounts.length
+          ? `Across ${accounts.length} authorized account${accounts.length === 1 ? '' : 's'}.`
+          : 'No authorized accounts are connected.',
+      icon: Landmark,
+    },
+    {
+      label: 'Money in',
+      value: '—',
+      detail: 'Transaction activity is not connected yet.',
+      icon: ArrowUpRight,
+    },
+    {
+      label: 'Money out',
+      value: '—',
+      detail: 'Transaction activity is not connected yet.',
+      icon: FileClock,
+    },
+  ]
+
   return (
     <div className="dashboard-page">
       <section className="page-intro" aria-labelledby="overview-title">
@@ -27,12 +68,14 @@ function Dashboard() {
           <div>
             <h1 id="overview-title">A clearer view<br className="title-break" /> of your money.</h1>
             <p className="intro-description">
-              A considered home for your financial picture. Your overview will take shape once an account is connected.
+              Authorized account balances appear here. Transaction activity will be available when ledger APIs are connected.
             </p>
           </div>
           <div className="preview-stamp">
             <ScanLine size={16} aria-hidden="true" />
-            <span>PREVIEW<br /><strong>NO ACCOUNT DATA</strong></span>
+            <span>PREVIEW<br /><strong>
+              {loading ? 'CHECKING ACCESS' : error ? 'DATA UNAVAILABLE' : accounts.length ? 'AUTHORIZED DATA' : 'NO ACCOUNT DATA'}
+            </strong></span>
           </div>
         </div>
       </section>
@@ -43,16 +86,19 @@ function Dashboard() {
             <span className="section-caption">AT A GLANCE</span>
             <h2>Overview</h2>
           </div>
-          <span className="data-note"><CircleHelp size={15} aria-hidden="true" /> No connected accounts</span>
+          <span className="data-note" role={error ? 'alert' : undefined}>
+            <CircleHelp size={15} aria-hidden="true" />
+            {error ? 'Account data unavailable' : loading ? 'Loading accounts' : `${accounts.length} authorized account${accounts.length === 1 ? '' : 's'}`}
+          </span>
         </div>
         <div className="overview-grid">
-          {overviewItems.map(({ label, detail, icon: Icon }, index) => (
+          {overviewItems.map(({ label, detail, icon: Icon, value }, index) => (
             <article className={`overview-card overview-card-${index + 1}`} key={label}>
               <div className="overview-card-top">
                 <span className="metric-label">{label}</span>
                 <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
               </div>
-              <div className="metric-value" aria-label="No data available">—</div>
+              <div className="metric-value">{value}</div>
               <p>{detail}</p>
             </article>
           ))}
@@ -80,7 +126,7 @@ function Dashboard() {
             <span className="empty-ledger-icon"><FileClock size={20} strokeWidth={1.7} aria-hidden="true" /></span>
             <div>
               <h3>Your ledger is ready for real activity.</h3>
-              <p>There are no transactions to display. LedgerLine never fills this space with sample financial data.</p>
+              <p>Transaction records are not connected yet. LedgerLine never fills this space with sample financial data.</p>
             </div>
           </div>
           <div className="ledger-foot">

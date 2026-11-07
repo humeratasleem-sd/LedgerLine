@@ -1,0 +1,194 @@
+package com.ledgerline.service;
+
+import java.time.Instant;
+import java.util.List;
+
+import com.ledgerline.dto.AccountPermissionRequest;
+import com.ledgerline.dto.AccountStatusRequest;
+import com.ledgerline.dto.AccountResponse;
+import com.ledgerline.dto.AuthenticatedUserResponse;
+import com.ledgerline.dto.CreateAccountRequest;
+import com.ledgerline.dto.UserRoleRequest;
+import com.ledgerline.entity.User;
+import com.ledgerline.enums.AccountStatus;
+import com.ledgerline.enums.Role;
+import com.ledgerline.exception.ResourceConflictException;
+import com.ledgerline.exception.ResourceNotFoundException;
+import com.ledgerline.repository.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AdminService {
+
+    private final JdbcTemplate jdbcTemplate;
+    private final UserRepository userRepository;
+    private final AccountAuthorizationService accountAuthorizationService;
+
+    public AdminService(
+            JdbcTemplate jdbcTemplate,
+            UserRepository userRepository,
+            AccountAuthorizationService accountAuthorizationService) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.userRepository = userRepository;
+        this.accountAuthorizationService = accountAuthorizationService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuthenticatedUserResponse> listUsers() {
+        return jdbcTemplate.query("""
+                SELECT id, full_name, email, role, account_status, created_at
+                FROM users
+                ORDER BY id
+                """, (resultSet, rowNumber) -> new AuthenticatedUserResponse(
+                resultSet.getLong("id"),
+                resultSet.getString("full_name"),
+                resultSet.getString("email"),
+                Role.valueOf(resultSet.getString("role")),
+                AccountStatus.valueOf(resultSet.getString("account_status")),
+                resultSet.getTimestamp("created_at").toInstant()));
+    }
+
+    @Transactional
+    public AccountResponse createAccount(Authentication actor, CreateAccountRequest request) {
+        long actorId = accountAuthorizationService.authenticatedUserId(actor);
+        ensureActiveUser(request.ownerUserId());
+
+        Integer duplicate = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM accounts WHERE account_number = ?",
+                Integer.class,
+                request.accountNumber());
+        if (duplicate != null && duplicate > 0) {
+            throw new ResourceConflictException("An account with this account number already exists.");
+        }
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            var statement = connection.prepareStatement("""
+                    INSERT INTO accounts (account_number, currency, balance_paise, status)
+                    VALUES (?, ?, 0, 'ACTIVE')
+                    """, new String[] {"id"});
+            statement.setString(1, request.accountNumber());
+            statement.setString(2, request.currency());
+            return statement;
+        }, keyHolder);
+        Number generatedId = keyHolder.getKey();
+        if (generatedId == null) {
+            throw new IllegalStateException("The database did not return the new account ID.");
+        }
+
+        long accountId = generatedId.longValue();
+        jdbcTemplate.update("""
+                INSERT INTO account_permissions (account_id, user_id, permission)
+                VALUES (?, ?, 'OWNER')
+                """, accountId, request.ownerUserId());
+        recordAdminAction(actorId, "ACCOUNT_CREATED", "ACCOUNT", Long.toString(accountId));
+        Instant createdAt = jdbcTemplate.queryForObject(
+                "SELECT created_at FROM accounts WHERE id = ?",
+                java.sql.Timestamp.class,
+                accountId).toInstant();
+        return new AccountResponse(
+                accountId, request.accountNumber(), request.currency(), "0", "ACTIVE", createdAt);
+    }
+
+    @Transactional
+    public void assignAccountPermission(
+            Authentication actor, long accountId, AccountPermissionRequest request) {
+        long actorId = accountAuthorizationService.authenticatedUserId(actor);
+        ensureActiveUser(request.userId());
+        ensureAccountExists(accountId);
+
+        int updated = jdbcTemplate.update("""
+                UPDATE account_permissions
+                SET permission = ?
+                WHERE account_id = ? AND user_id = ?
+                """, request.permission().name(), accountId, request.userId());
+        if (updated == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO account_permissions (account_id, user_id, permission)
+                    VALUES (?, ?, ?)
+                    """, accountId, request.userId(), request.permission().name());
+        }
+        recordAdminAction(actorId, "ACCOUNT_PERMISSION_CHANGED", "ACCOUNT", Long.toString(accountId));
+    }
+
+    @Transactional
+    public void updateUserStatus(Authentication actor, long userId, AccountStatusRequest request) {
+        long actorId = accountAuthorizationService.authenticatedUserId(actor);
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        if (target.getAccountStatus() == request.accountStatus()) {
+            return;
+        }
+        if (actorId == userId && request.accountStatus() == AccountStatus.DISABLED) {
+            throw new ResourceConflictException("You cannot disable your own administrator account.");
+        }
+        if (target.getRole() == Role.ADMIN && request.accountStatus() == AccountStatus.DISABLED) {
+            List<Long> activeAdminIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE' FOR UPDATE",
+                    Long.class);
+            if (activeAdminIds.size() <= 1) {
+                throw new ResourceConflictException("The last active administrator cannot be disabled.");
+            }
+        }
+
+        jdbcTemplate.update(
+                "UPDATE users SET account_status = ?, active = ? WHERE id = ?",
+                request.accountStatus().name(),
+                request.accountStatus() == AccountStatus.ACTIVE,
+                userId);
+        recordAdminAction(actorId, "USER_STATUS_CHANGED", "USER", Long.toString(userId));
+    }
+
+    @Transactional
+    public void updateUserRole(Authentication actor, long userId, UserRoleRequest request) {
+        long actorId = accountAuthorizationService.authenticatedUserId(actor);
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        if (target.getRole() == request.role()) {
+            return;
+        }
+        if (actorId == userId && target.getAccountStatus() == AccountStatus.ACTIVE
+                && request.role() != Role.ADMIN) {
+            throw new ResourceConflictException("You cannot remove your own active administrator role.");
+        }
+        if (target.getRole() == Role.ADMIN
+                && target.getAccountStatus() == AccountStatus.ACTIVE
+                && request.role() != Role.ADMIN) {
+            List<Long> activeAdminIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM users WHERE role = 'ADMIN' AND account_status = 'ACTIVE' FOR UPDATE",
+                    Long.class);
+            if (activeAdminIds.size() <= 1) {
+                throw new ResourceConflictException("The last active administrator cannot be demoted.");
+            }
+        }
+
+        jdbcTemplate.update("UPDATE users SET role = ? WHERE id = ?", request.role().name(), userId);
+        recordAdminAction(actorId, "USER_ROLE_CHANGED", "USER", Long.toString(userId));
+    }
+
+    private void ensureActiveUser(long userId) {
+        userRepository.findById(userId)
+                .filter(user -> user.getAccountStatus() == AccountStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("Active user not found."));
+    }
+
+    private void ensureAccountExists(long accountId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, accountId);
+        if (count == null || count == 0) {
+            throw new ResourceNotFoundException("Account not found.");
+        }
+    }
+
+    private void recordAdminAction(long actorId, String action, String entityType, String entityId) {
+        jdbcTemplate.update("""
+                INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id)
+                VALUES (?, ?, ?, ?)
+                """, actorId, action, entityType, entityId);
+    }
+}

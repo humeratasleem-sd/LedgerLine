@@ -42,3 +42,67 @@ Establish a modest, modular Java 25 / Spring Boot 4.x and React/Vite foundation 
 - Ports 8080 and 5173 were not listening during the check. The health request failed to connect. Database credentials and `LEDGERLINE_JWT_SECRET_BASE64` were absent; a startup attempt failed during Flyway connection because the unresolved DB username placeholder was passed to MySQL. The migration was not applied. Migration validity is therefore a source review only, not a database execution result.
 
 Day 1 is **not yet fully verified or ready to mark complete** until the configured database migration and live backend/frontend health connection are checked. None of these results certify the application for handling money.
+
+## Entry 3 — Day 2 authentication implementation
+
+### Date and request
+2026-11-07. Asked to inspect the existing LedgerLine application, preserve its dashboard, finish and verify Day 1 where possible, and implement real registration, login, JWT authentication, role authorization, account permission checks, frontend authentication, automated tests, and current documentation. Money movement was explicitly excluded.
+
+### Generated changes
+- Added a profile/status-aware `User` entity; DTOs; BCrypt registration/login; HS256 access-token issuance; token expiry; a DB-backed role/status lookup on authenticated requests; safe profile responses; 401/403 handling; and route authorization.
+- Added admin user/status, zero-balance account creation, and permission-management APIs; scoped account reads; read-only audit events; and same-transaction audit records for admin changes. No money movement was added.
+- Added reusable account permission checks, a V2 migration for user profile/status fields, test-scoped H2 and MVC testing dependencies, and integration/unit tests.
+- Added in-memory React auth context, sign-in/sign-up/profile pages, protected routes, role-filtered navigation, logout and Axios 401/403 handling. Connected account balances and administrative audit records to real APIs; balance paise are returned/displayed as integer strings. Statements and transactions remain unimplemented.
+- Reworked root setup, threat, and AI-development documentation and added a backend environment-variable example with placeholders.
+
+### Corrections made during verification
+- First compilation of the new MVC test failed because the Spring Boot 4 modular MVC test starter was not on the classpath. Added `spring-boot-starter-webmvc-test`.
+- Initial integration-test scaffolding depended on a test-slice security configuration that did not construct `HttpSecurity` and initially used unnecessary Mockito stubs. Replaced that test approach with a real Spring Boot context against H2 (Flyway explicitly disabled), removed unnecessary stubs, and fixed the account-permission varargs assertion.
+- Frontend lint identified an HMR rule violation from exporting a hook alongside the auth provider. Split the context and hook exports into separate modules.
+- Tightened default route behavior to deny unmatched API paths and limited account mutations to ADMIN, rather than relying on authentication alone.
+- The first account-creation integration test found that H2 returned both the generated ID and created timestamp through a generic generated-keys request. Changed the insert to request only the `id` key; the admin API integration test then passed.
+- Review found the account permission helper was not yet called by a real resource handler. Added account list/detail endpoints and tests proving users cannot read another user's account.
+
+### Verification
+- `.\mvnw.cmd test` — passed, 33 tests, 0 failures/errors/skips. Integration tests exercise actual registration, duplicate-email rejection, BCrypt storage, login, current profile, valid/expired/invalid JWT handling, role restrictions, admin account creation and audit, user status, account permission assignment/scope, registration role elevation rejection, and H2 health endpoint behavior. Flyway is disabled in this test context.
+- `.\mvnw.cmd compile` — passed.
+- `npm run lint` — passed.
+- `npm run build` — passed.
+- The database migration was not run on MySQL, and a live MySQL-backed startup/health check is not claimed: environment DB credentials are unset. The test H2 context does not verify the MySQL Flyway migration.
+- No Git commit was created; therefore no commit link is available.
+
+### Remaining
+Provision and connect a MySQL test database, apply both migrations, validate Hibernate schema and live health, and add an admin UI plus transaction/statement APIs only after their financial invariants are specified. Authentication tests do not establish financial integrity or readiness for real funds.
+
+## Entry 4 — Day 1/Day 2 complete audit and corrections
+
+### Date and request
+2026-11-07. Requested a full itemized audit of Day 1 and Day 2, correction of implementable gaps, actual reruns, an audit report, and no Day 3 or money movement.
+
+### Initial findings
+- Audited the full tracked project layout, current uncommitted changes, Maven/npm manifests, security configuration, schema/migrations, documentation, Java 25/Maven/Node versions, Git repository and origin.
+- Found that the initial schema used `ledger_transactions` instead of the required `transactions` table name.
+- There was no supported initial ADMIN provisioning process or protected role-change endpoint.
+- There were no endpoint validation tests; the user/account/role and frontend documentation/test totals needed an updated checklist.
+- MySQL80 was running and TCP 3306 accepted a connection, but DB username/password and JWT key environment variables were absent. This does not verify database authentication, Flyway, or live backend health.
+
+### Changes produced
+- Added forward-only Flyway V3 to rename `ledger_transactions` to `transactions`, retaining the existing V1 migration history.
+- Added an opt-in one-time startup ADMIN bootstrap configured through environment variables only (no public bootstrap endpoint), BCrypt storage, validation, an audit record, and tests. Added ADMIN-only role change, audited and guarded against demoting the last active administrator.
+- Added invalid registration-field tests and expanded admin/bootstrap tests. Updated dashboard state messaging so its data badge reflects authorized, absent, loading, or unavailable account data.
+- Added this comprehensive 99-item audit report with initial and final statuses and evidence, refreshed setup/threat/prompt records, and kept all financial movement out of scope.
+
+### Actual corrections during this audit
+- The first `AdminBootstrapTest` run found a Mockito verification that mixed a matcher with a raw argument. Replaced the raw argument with `eq(...)`; the rerun passed.
+- Tried to load the optional `agent-browser` CLI workflow; the executable is not installed. No browser CLI dependency was added. UI behavior is therefore recorded only to the level actually covered by frontend builds and backend integration tests; do not claim a browser E2E run.
+
+### Verification
+- `.\mvnw.cmd compile` — passed.
+- `.\mvnw.cmd test` — passed, 40 tests, 0 failures/errors/skips. The test application uses H2 and disables Flyway; it does not verify MySQL migrations.
+- `npm run lint` — passed.
+- `npm run build` — passed.
+- The final MySQL-backed startup/migration/health check remains blocked because DB credentials are not configured. The schema/migrations are inspectable source, not a successful migration result.
+- Git commit/push outcomes are recorded in the final audit report after the repository action is attempted. No fabricated commit link is included.
+
+### Remaining
+Configure a disposable MySQL database and credentials, run Flyway V1–V3 and Hibernate validation, and obtain a live health response. Review/perform the protected first-admin bootstrap only in the intended environment and clear its bootstrap password immediately afterward. No money movement was added.

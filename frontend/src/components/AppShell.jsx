@@ -5,17 +5,19 @@ import {
   FileText,
   LayoutDashboard,
   Landmark,
+  LogOut,
   WalletCards,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth.js'
 import HealthStatus from './HealthStatus.jsx'
 
 const navigation = [
-  { label: 'Overview', path: '/', icon: LayoutDashboard },
-  { label: 'Accounts', path: '/accounts', icon: Landmark },
-  { label: 'Transfers', path: '/transfers', icon: ArrowLeftRight },
-  { label: 'Statements', path: '/statements', icon: FileText },
-  { label: 'Audit trail', path: '/audit', icon: BadgeCheck },
+  { label: 'Overview', path: '/', icon: LayoutDashboard, roles: ['ADMIN', 'ACCOUNT_HOLDER', 'AUDITOR'] },
+  { label: 'Accounts', path: '/accounts', icon: Landmark, roles: ['ADMIN', 'ACCOUNT_HOLDER', 'AUDITOR'] },
+  { label: 'Transfers', path: '/transfers', icon: ArrowLeftRight, roles: ['ACCOUNT_HOLDER'] },
+  { label: 'Statements', path: '/statements', icon: FileText, roles: ['ADMIN', 'ACCOUNT_HOLDER', 'AUDITOR'] },
+  { label: 'Audit trail', path: '/audit', icon: BadgeCheck, roles: ['ADMIN', 'AUDITOR'] },
 ]
 
 const pageNames = {
@@ -24,11 +26,16 @@ const pageNames = {
   '/transfers': 'Transfers',
   '/statements': 'Statements',
   '/audit': 'Audit trail',
+  '/profile': 'My profile',
 }
 
 function AppShell() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, logout, forbiddenNotice, clearForbiddenNotice } = useAuth()
   const pageName = pageNames[pathname] || 'Overview'
+  const visibleNavigation = navigation.filter(({ roles }) => roles.includes(user.role))
+  const initials = user.fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
   return (
     <div className="app-frame">
@@ -42,7 +49,7 @@ function AppShell() {
 
         <div className="workspace-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Main navigation">
-          {navigation.map(({ label, path, icon: Icon }) => (
+          {visibleNavigation.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={path}
               to={path}
@@ -76,20 +83,41 @@ function AppShell() {
           </div>
           <div className="topbar-tools">
             <HealthStatus />
-            <div className="profile-placeholder" aria-label="Preview workspace, no signed-in user">
-              <span className="profile-avatar" aria-hidden="true">LL</span>
-              <span className="profile-label">Preview workspace</span>
-            </div>
+            <NavLink className="profile-placeholder" to="/profile" aria-label="View your profile">
+              <span className="profile-avatar" aria-hidden="true">{initials}</span>
+              <span className="profile-label">{user.fullName}</span>
+            </NavLink>
+            <button
+              className="logout-button"
+              type="button"
+              onClick={() => {
+                logout()
+                navigate('/login', { replace: true })
+              }}
+            >
+              <LogOut size={15} aria-hidden="true" />
+              <span>Sign out</span>
+            </button>
           </div>
         </header>
 
         <main className="main-content" id="main-content">
+          {forbiddenNotice && (
+            <div className="forbidden-notice" role="alert">
+              <span>{forbiddenNotice}</span>
+              <button type="button" onClick={clearForbiddenNotice} aria-label="Dismiss access message">Dismiss</button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
 
-      <nav className="mobile-nav" aria-label="Mobile navigation">
-        {navigation.map(({ label, path, icon: Icon }) => (
+      <nav
+        className="mobile-nav"
+        aria-label="Mobile navigation"
+        style={{ gridTemplateColumns: `repeat(${visibleNavigation.length}, minmax(0, 1fr))` }}
+      >
+        {visibleNavigation.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}

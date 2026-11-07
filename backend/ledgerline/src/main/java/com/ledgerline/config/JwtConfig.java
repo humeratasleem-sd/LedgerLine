@@ -6,6 +6,7 @@ import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.ledgerline.enums.Role;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,8 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
@@ -27,18 +30,7 @@ public class JwtConfig {
     JwtDecoder jwtDecoder(
             @Value("${ledgerline.security.jwt.secret-base64}") String secretBase64,
             @Value("${ledgerline.security.jwt.issuer}") String issuer) {
-        byte[] keyBytes;
-        try {
-            keyBytes = Base64.getDecoder().decode(secretBase64);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("LEDGERLINE_JWT_SECRET_BASE64 must be valid Base64.", exception);
-        }
-
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("LEDGERLINE_JWT_SECRET_BASE64 must decode to at least 32 bytes.");
-        }
-
-        SecretKey secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
+        SecretKey secretKey = secretKey(secretBase64);
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
@@ -59,6 +51,25 @@ public class JwtConfig {
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(issuer), requiredClaimsValidator));
         return decoder;
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(@Value("${ledgerline.security.jwt.secret-base64}") String secretBase64) {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey(secretBase64)));
+    }
+
+    private SecretKey secretKey(String secretBase64) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secretBase64);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("LEDGERLINE_JWT_SECRET_BASE64 must be valid Base64.", exception);
+        }
+
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("LEDGERLINE_JWT_SECRET_BASE64 must decode to at least 32 bytes.");
+        }
+        return new SecretKeySpec(keyBytes, "HmacSHA256");
     }
 
     private boolean isKnownRole(String role) {
