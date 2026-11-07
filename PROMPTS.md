@@ -126,6 +126,7 @@ Configure a disposable MySQL database and credentials, run Flyway V1–V3 and Hi
 - `npm run lint` and `npm run build` — passed.
 - Playwright guest-page checks passed as listed above. Authenticated browser/API flows remain blocked pending MySQL credentials.
 - Flyway migration execution, Hibernate validation against MySQL, MySQL-backed `/actuator/health`, and failure/repair simulation remain **not run**. No database was altered.
+- Commit [`98a3bc2eefd6a2504ca08ff6789b7224b025af74`](https://github.com/humeratasleem-sd/LedgerLine/commit/98a3bc2eefd6a2504ca08ff6789b7224b025af74) was pushed to `main`; the remote head was verified with `git ls-remote`.
 
 ### Remaining
 Provide a disposable MySQL database with scoped credentials, then run V1–V3, inspect the migrated schema/history, verify Hibernate and health, and simulate a failed migration only on a disposable copy. Run authenticated browser checks against that backend using actual test users for each role. No money movement or Day 3 work was added.
