@@ -130,3 +130,21 @@ Configure a disposable MySQL database and credentials, run Flyway V1–V3 and Hi
 
 ### Remaining
 Provide a disposable MySQL database with scoped credentials, then run V1–V3, inspect the migrated schema/history, verify Hibernate and health, and simulate a failed migration only on a disposable copy. Run authenticated browser checks against that backend using actual test users for each role. No money movement or Day 3 work was added.
+
+## Entry 6 — LedgerLine Days 1–7 completion request
+
+### Date and request
+2026-11-08. Requested completion of the existing seven-day LedgerLine project, implementation of secure ledger/account/statement flows, tests and documentation, safe local MySQL setup guidance, verification, and a reviewed commit/push to the existing `main` branch. Requested that unavailable MySQL/browser evidence be explicitly marked partial or blocked and that no credentials be shared.
+
+### Work produced
+- Inspected existing source, configuration, migration history, tests, audit and project documentation. No authoritative original seven-day schedule was found; documented a reconstructed schedule and its assumptions instead of claiming it was original.
+- Added transaction posting, account statements, account lifecycle changes, scoped idempotency, external settlement references, balanced journal entries and append-only migration controls, with H2 integration coverage.
+- Added API, architecture/database and demo documentation; updated README, Day 1/2 audit, progress, and threat records to distinguish source/H2 evidence from unverified MySQL behavior.
+- No MySQL credentials were available to the process. No database was contacted or changed; no secret was requested or recorded.
+- Backend/frontend run results and MySQL/browser limitations are recorded in the verification documents. Commit/push status is reported in the final response after Git operations. No AI history beyond this actual request and work is asserted here.
+
+### Verification corrections and results
+- The first Maven package run exposed that `permissionExists` had accidentally been nested in `lockAccount`; moved it to class scope and reran package successfully.
+- The first frontend utility test expected western digit grouping for an `en-IN` INR formatter. Corrected its expected Indian grouping rather than changing the formatter.
+- Review of retry behavior showed the transfer page generated a new idempotency key after an uncertain network/server failure. Added request-fingerprint-based key reuse for unchanged retries, with a frontend utility test; changed request details receive a new key.
+- Final Maven/frontend, browser, MySQL and Git results are summarized in `DAY3_DAY7_PROGRESS.md` and the audit follow-up. MySQL remains unverified and no database was accessed.

@@ -33,15 +33,30 @@ public class AccountService {
     }
 
     public List<AccountResponse> listAuthorizedAccounts(Authentication authentication) {
+        if (accountAuthorizationService.isAdministrator(authentication)
+                || accountAuthorizationService.isAuditor(authentication)) {
+            return jdbcTemplate.query(
+                    ACCOUNT_FIELDS + "ORDER BY a.created_at DESC, a.id DESC",
+                    ACCOUNT_ROW_MAPPER);
+        }
         long userId = accountAuthorizationService.authenticatedUserId(authentication);
         return jdbcTemplate.query(
-                ACCOUNT_FIELDS + """
+                """
+                        SELECT a.id, a.account_number, a.currency, a.balance_paise, a.status, a.created_at,
+                               ap.permission
+                        FROM accounts a
                         JOIN account_permissions ap ON ap.account_id = a.id
                         WHERE ap.user_id = ?
                         ORDER BY a.created_at DESC, a.id DESC
                         """,
-                ACCOUNT_ROW_MAPPER,
+                (resultSet, rowNumber) -> mapAccount(resultSet, resultSet.getString("permission")),
                 userId);
+    }
+
+    public List<AccountResponse> listAllAccounts() {
+        return jdbcTemplate.query(
+                ACCOUNT_FIELDS + "ORDER BY a.created_at DESC, a.id DESC",
+                ACCOUNT_ROW_MAPPER);
     }
 
     public AccountResponse getAuthorizedAccount(Authentication authentication, long accountId) {
@@ -56,12 +71,17 @@ public class AccountService {
     }
 
     private static AccountResponse mapAccount(ResultSet resultSet) throws SQLException {
+        return mapAccount(resultSet, null);
+    }
+
+    private static AccountResponse mapAccount(ResultSet resultSet, String permission) throws SQLException {
         return new AccountResponse(
                 resultSet.getLong("id"),
                 resultSet.getString("account_number"),
                 resultSet.getString("currency"),
                 Long.toString(resultSet.getLong("balance_paise")),
                 resultSet.getString("status"),
-                resultSet.getTimestamp("created_at").toInstant());
+                resultSet.getTimestamp("created_at").toInstant(),
+                permission);
     }
 }

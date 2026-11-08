@@ -9,7 +9,7 @@ function Audit() {
 
   useEffect(() => {
     let active = true
-    apiClient.get('/api/audit/events')
+    apiClient.get('/api/audit/events?limit=50')
       .then(({ data }) => {
         if (active) setEvents(data)
       })
@@ -32,6 +32,7 @@ function Audit() {
           <h1 id="audit-title">Audit trail</h1>
           <p>Administrative changes are recorded for authorized read-only review.</p>
         </div>
+        <p className="read-only-note">Read-only view · available to administrators and auditors.</p>
         <span className="coming-icon" aria-hidden="true"><BadgeCheck size={22} strokeWidth={1.7} /></span>
       </div>
       {loading && <p className="account-message" role="status">Loading audit events…</p>}

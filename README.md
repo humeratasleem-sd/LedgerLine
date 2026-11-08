@@ -1,27 +1,26 @@
 # LedgerLine
 
-LedgerLine is an early financial transaction management application foundation. It includes a React dashboard, a Spring Boot API, a MySQL/Flyway schema, and Day 2 authentication. It is not ready to process or safeguard real money.
+LedgerLine is a development/demo account ledger built with Spring Boot, React, MySQL and Flyway. It is not a payment processor, bank, or production-ready financial system.
 
-## Current status (2026-11-07)
+## Current status (2026-11-08)
 
-Implemented and verified in code/tests:
+Implemented in source and H2-backed automated tests:
 
-- Java 25 and Spring Boot 4.0.9 backend with Maven, Spring Security, Spring Data JPA, BCrypt, JWT, Actuator, and Flyway dependencies.
-- Environment-based MySQL/JWT configuration and Hibernate schema validation (`ddl-auto=validate`); Hibernate does not create or update the production schema.
-- Flyway V1 core schema, V2 user-profile/status extension, and V3 transaction-table rename. Monetary amounts and balances use integer `BIGINT` paise.
-- Public registration is restricted to `ACCOUNT_HOLDER`; login issues signed HS256 access tokens with configured issuer and expiry.
-- Authenticated requests reload the user role and status from the database. `/api/auth/me` derives identity from the verified token subject.
-- Stateless security rules, role restrictions, safe 401/403 responses, account-level authorization, and fail-closed unmatched API routes.
-- Admin APIs for user listing/status management, zero-balance account creation, and permission assignment; admin changes are appended to audit events.
-- Authorized account reads and read-only audit-event retrieval. The dashboard and Accounts/Audit pages use actual backend responses; account balances are kept as integer paise strings at the frontend boundary.
-- Existing dashboard retained, with login, registration, profile, logout, role-filtered navigation, and an Axios bearer interceptor. Tokens are held only in JavaScript memory, never local/session storage.
-- No invented transactions, balances, or API success responses. Statements and transfers remain non-operational; there is no money-movement API.
+- Java 25 / Spring Boot 4.0.9 API, Spring Security, JPA, BCrypt, signed JWTs, Actuator and Flyway.
+- Environment-backed database and JWT configuration; Hibernate is `ddl-auto=validate`, Flyway clean is disabled.
+- Flyway V1-V4 source: users/accounts/permissions, transactions, user-scoped idempotency, ledger entries, system clearing account, external settlement reservation, audit records and append-only triggers.
+- Public registration is ACCOUNT_HOLDER-only; JWT signature, issuer and expiry are checked, and current role/status is reloaded from the database per request.
+- Server-enforced role and account permission rules, safe 401/403 handling, ADMIN management and read-only AUDITOR views.
+- Admin account provisioning, lifecycle and permission management; account-holder transfers; per-account statements.
+- ADMIN-attested external settlement deposits/withdrawals only. These are manual ledger postings after independent verification outside LedgerLine; no bank/card/payment rail is called.
+- Paise are positive integer `BIGINT` values. A successful operation changes customer balances and writes balanced paired ledger entries, idempotency state and audit record within a DB transaction. A refused business operation is stored as FAILED without ledger/balance changes.
+- Responsive dashboard, account, transfer, statement and admin pages consume real API responses and show loading/error/empty states. No balances or success outcomes are fabricated.
 
-**Still not verified:** the MySQL migrations have not been applied to the configured MySQL server; no database credentials are set in this environment, and the backend has not been started against MySQL. Maven integration tests use an isolated H2 database and explicitly disable Flyway, so they do not prove MySQL compatibility or migration execution. The live health endpoint was separately exercised against a temporary H2-backed backend, not MySQL.
+**Database status: BLOCKED.** The current process has no MySQL credentials. Flyway V1-V4 have not been executed, and Hibernate validation or live MySQL health have not been verified. Tests use H2 with Flyway disabled and cannot certify MySQL DDL, row locking or trigger behavior.
 
-**Not implemented:** account-management UI, statements, transaction history APIs/execution, balanced double-entry validation, idempotency processing, locking/concurrency handling, transaction audit events, MFA, password reset, rate limiting, refresh tokens, and production secret/DB privilege management.
+**Browser status: PARTIAL.** Public pages and unauthenticated route protection can be tested locally. Authenticated browser/API flows require the backend and a verified disposable database. Do not report them as a pass until exercised with real API responses.
 
-Successful compilation or authentication tests do not guarantee financial integrity. No money movement is enabled.
+This project is not certified for real funds. External settlement attestation, environment/database security, MySQL migration verification, audit monitoring, backup/recovery, operational controls and independent accounting review remain risks.
 
 ## Technology
 
@@ -38,34 +37,60 @@ Successful compilation or authentication tests do not guarantee financial integr
 - Node.js and npm
 - A dedicated MySQL database and application user; do not use the MySQL root account
 
-## Database and backend setup (PowerShell)
+## Database safety and backend setup (Windows)
 
-Create the `ledgerline_db` database and an application database user. Configure the database user with only the required application and Flyway privileges. Then, from the repository root, set the connection values and generate a random JWT key in the current PowerShell session:
+Never use an exposed root password. Do not paste credentials into chat or put them in Git. From Windows CMD, open the MySQL client; `-p` prompts for the current root password without putting it in the command:
+
+```cmd
+mysql -u root -p
+```
+
+In the interactive MySQL prompt, inspect the root host and rotate that account; the server generates a fresh password locally. Create a database user with privileges scoped to `ledgerline_db` (not `*.*`):
+
+```sql
+SELECT user, host FROM mysql.user WHERE user = 'root';
+ALTER USER 'root'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+CREATE DATABASE IF NOT EXISTS ledgerline_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'ledgerline_app'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, TRIGGER
+    ON ledgerline_db.* TO 'ledgerline_app'@'localhost';
+SELECT COUNT(*) AS existing_objects
+    FROM information_schema.tables WHERE table_schema = 'ledgerline_db';
+```
+
+`IDENTIFIED BY RANDOM PASSWORD` returns a generated secret in the local client. Store it in a password manager. If the `root` account host is not `localhost`, use the exact host returned by the first query. If the existing `ledgerline_db` schema contains any objects, stop: do not migrate it or drop/reset it. Proceed only when you have created/verified a newly disposable, empty target. No MySQL migration has been run by this session.
+
+From CMD, use a separate PowerShell process to prompt locally for the dedicated DB credentials (the password prompt is hidden) and generate a random JWT key for this process. No secret is included as a command argument:
+
+```powershell
+powershell -NoProfile
+```
+
+In that PowerShell window:
 
 ```powershell
 $env:LEDGERLINE_DB_URL = "jdbc:mysql://localhost:3306/ledgerline_db?serverTimezone=UTC"
-$env:LEDGERLINE_DB_USERNAME = Read-Host "MySQL username"
-$securePassword = Read-Host "MySQL password" -AsSecureString
-$env:LEDGERLINE_DB_PASSWORD = [System.Net.NetworkCredential]::new("", $securePassword).Password
-$keyBytes = [byte[]]::new(32)
-[System.Security.Cryptography.RandomNumberGenerator]::Fill($keyBytes)
-$env:LEDGERLINE_JWT_SECRET_BASE64 = [Convert]::ToBase64String($keyBytes)
+$env:LEDGERLINE_DB_USERNAME = Read-Host "Database username"
+$secret = Read-Host "Database password" -AsSecureString
+$env:LEDGERLINE_DB_PASSWORD = [System.Net.NetworkCredential]::new("", $secret).Password
+$bytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$env:LEDGERLINE_JWT_SECRET_BASE64 = [Convert]::ToBase64String($bytes)
 $env:LEDGERLINE_JWT_ISSUER = "ledgerline"
-$env:LEDGERLINE_JWT_ACCESS_TOKEN_TTL = "PT15M"
 $env:LEDGERLINE_CORS_ALLOWED_ORIGINS = "http://localhost:5173"
-```
-
-`backend/ledgerline/.env.example` lists the variable names but is not automatically loaded by Spring. Its credential and key values are placeholders; generate real local values as above and never commit them.
-
-Start the backend from the repository root:
-
-```powershell
+Set-Location C:\Users\syedt\Documents\LedgerLine
 .\backend\ledgerline\mvnw.cmd -f backend\ledgerline\pom.xml spring-boot:run
 ```
 
-Flyway applies V1 through V3 during startup. The database, DB username/password, and a valid Base64 JWT secret (at least 32 decoded bytes) are required. Startup intentionally does not fall back to default credentials or a weak signing key. Hibernate validates the migrated schema and does not update it.
+The database, username/password and JWT key are required; there are no credential fallbacks. Flyway applies V1-V4 at startup and Hibernate validates the result without creating/updating tables. First confirm MySQL version and that the exact disposable `ledgerline_db` is empty. After startup, inspect `flyway_schema_history`, expected tables/triggers and `/actuator/health`. Stop if any target/schema ambiguity exists.
 
-For migration verification, use a newly created, disposable MySQL 8.0.16+ database and a restricted user scoped only to that database. Never point this check at production or a database containing user data. Confirm `SELECT VERSION()`, start the application against the disposable schema, then inspect `flyway_schema_history` and `information_schema.tables` and request `/actuator/health`. Verify V1–V3 and the `transactions` table before treating migrations as applied.
+Alternatively, after independently verifying that the target is a newly created, empty disposable `ledgerline_db`, start the helper from the repository root. It prompts for the dedicated database user/password, asks you to confirm the schema name, generates a process-only JWT key, and clears its environment variables when Maven exits:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1
+```
+
+The confirmation is an operator check, not an automatic database emptiness check. Do not run this helper against an existing or production schema.
 
 MySQL DDL is not generally transactional across all statements in a migration. If a migration fails, do not assume Flyway rolled back every earlier DDL statement. Stop the app, inspect the disposable schema and `flyway_schema_history`, and restore/recreate only that disposable schema before retrying. Do not run `flyway clean` or destructive cleanup against production. A failed-migration recovery test has not yet been run in this environment.
 
@@ -120,11 +145,17 @@ All request/response bodies are JSON. Authentication failures return a generic `
 | `GET` | `/api/auth/me` | Bearer token | Returns the authenticated profile using the token subject, never a caller-supplied user ID. |
 | `GET` | `/api/accounts` | Any authenticated role | Lists only accounts with an `account_permissions` row for the token's user. |
 | `GET` | `/api/accounts/{accountId}` | Any authenticated role | Requires account permission before returning account details. |
+| `GET` | `/api/accounts/{accountId}/transactions?limit=50` | Any authenticated role | Scoped statement including completed/refused transaction records; limit 1-100. |
 | `GET` | `/api/admin/users` | ADMIN | Returns safe user profiles. |
+| `GET` | `/api/admin/accounts` | ADMIN | Lists all account records for management. |
 | `PATCH` | `/api/admin/users/{userId}/status` | ADMIN | Enables/disables users; blocks self-disable and disabling the last active admin. |
 | `PATCH` | `/api/admin/users/{userId}/role` | ADMIN | Changes roles, prevents demoting the last active ADMIN, and writes an audit event. |
 | `POST` | `/api/admin/accounts` | ADMIN | Creates an ACTIVE account with zero paise and assigns an active user as OWNER. |
+| `PATCH` | `/api/admin/accounts/{accountId}/status` | ADMIN | Freezes/activates/closes accounts; closing requires zero balance. |
 | `PUT` | `/api/admin/accounts/{accountId}/permissions` | ADMIN | Creates/updates an account permission for an active user. |
+| `POST` | `/api/transactions/transfers` | ACCOUNT_HOLDER | Requires source OWNER/TRANSFER permission and `Idempotency-Key`; balanced journal, row locks and atomic update. |
+| `POST` | `/api/admin/transactions/deposits` | ADMIN | Manual posting for externally verified settlement only; unique external reference required. |
+| `POST` | `/api/admin/transactions/withdrawals` | ADMIN | Manual posting for externally verified settlement only; source balance enforced. |
 | `GET` | `/api/audit/events?limit=50` | ADMIN, AUDITOR | Returns up to 100 newest audit events; read-only. |
 | `GET` | `/actuator/health` | Public | Spring Actuator health; detailed component data remains hidden. |
 
@@ -135,21 +166,23 @@ Passwords require at least 12 characters and are BCrypt-hashed. Because BCrypt p
 ## Authorization behavior
 
 - Only `ADMIN` can access `/api/admin/**` and mutate `/api/accounts/**`.
-- `ADMIN` and `AUDITOR` can read `/api/audit/**`; all audit write methods are denied.
-- `ACCOUNT_HOLDER` can write under `/api/transfers/**` and `/api/transactions/**`; auditors and admins cannot. No such controller or money movement operation is currently implemented.
-- `ADMIN`, `ACCOUNT_HOLDER`, and `AUDITOR` may read transaction/ledger route prefixes, but those data controllers are not implemented. Account reads are scoped by `account_permissions`.
-- Ledger mutation routes are denied. V1 includes database triggers preventing ordinary ledger-entry and audit-row updates/deletes.
+- `ADMIN` and `AUDITOR` can read `/api/audit/**`; all audit write methods are denied. Admins/auditors may view all account statements; account holders require matching account permission.
+- `ACCOUNT_HOLDER` can transfer under `/api/transactions/transfers`; admin/auditor roles cannot. Transfers require OWNER/TRANSFER permission on the source account.
+- ADMIN-only deposit/withdrawal routes record externally verified settlement and require an explicit boolean attestation plus external reference; they do not process external payments.
+- Transfer requests require a printable ASCII `Idempotency-Key` (8-255 characters). Same key and request returns the prior outcome; a changed request conflicts. Successful external settlement references are reserved once.
+- Account lifecycle and permission changes serialize on the account row to avoid racing a posting.
+- V1/V4 triggers are intended to prevent ordinary ledger, audit, transaction and external-settlement history updates/deletes. Trigger execution still requires real MySQL verification.
 - Unmatched API routes are denied by default.
-- `AccountAuthorizationService` checks permissions against `account_permissions` using the authenticated subject. The account read endpoints invoke it. Any future account/transaction write service must use the same permission checks.
+- `AccountAuthorizationService` checks permissions against `account_permissions` using the authenticated subject. Financial writes lock account rows and check source permission on the server.
 - Current user role and active status are looked up from the DB for each authenticated request, so disabling a user or changing their role takes effect without waiting for token expiry.
-- Admin account/user-status/permission changes are written to `audit_events`; audit events are read-only through the API. Financial transaction events are not generated because transaction APIs do not exist.
+- Admin account/user-status/permission changes and financial completed/refused outcomes are written to `audit_events`; audit events are read-only through the API.
 - Public signup always chooses `ACCOUNT_HOLDER`. Administrator roles cannot be assigned through public signup; initial provisioning is gated by explicit one-time environment configuration, and subsequent role changes require an authenticated ADMIN and are audited.
 
 ## Database schema
 
-V1 creates `users`, `accounts`, `account_permissions`, `ledger_transactions`, `ledger_entries`, `idempotency_keys`, and `audit_events`. V3 renames the transaction table to `transactions`; MySQL migration execution is still required to verify the resulting database schema. All monetary values (`balance_paise`, `amount_paise`) are signed integer `BIGINT` paise with constraints where applicable. V2 adds `full_name` and constrained `account_status` to `users`, preserving the existing `active` column for migration compatibility.
+V1 creates `users`, `accounts`, `account_permissions`, `ledger_transactions`, `ledger_entries`, `idempotency_keys`, and `audit_events`. V3 renames the transaction table to `transactions`; V4 adds financial posting metadata and system settlement tracking. MySQL migration execution is still required to verify the resulting schema. Monetary values (`balance_paise`, `amount_paise`) are integer `BIGINT` paise.
 
-The schema includes primary/unique/foreign-key constraints, indexes, non-negative balance and positive posting checks, user-scoped idempotency uniqueness, and append-only triggers for ledger/audit rows. This schema alone does not guarantee balanced postings, safe concurrent balances, or end-to-end financial integrity.
+Each successful operation creates two equal opposite journal rows; the service verifies two-row count and debit/credit totals before commit. User-scoped idempotency keys, ascending account row locks, transactional audit and balance updates, and append-only triggers are implemented in source. H2 tests do not prove MySQL-specific locking/triggers. Existing balances are not automatically reconciled to opening ledger entries; this is a demo ledger, not proof of complete financial integrity.
 
 ## Tests and verification
 
@@ -160,28 +193,24 @@ Run from the repository root:
 .\backend\ledgerline\mvnw.cmd -f backend\ledgerline\pom.xml compile
 Set-Location frontend
 npm run lint
+npm test
 npm run build
 ```
 
 Backend integration tests use H2 with Flyway disabled; migration verification requires a configured MySQL instance and a successful application startup. Do not treat test-database validation as proof the MySQL migration ran.
 
-Verification run on 2026-11-07:
+Latest verification evidence:
 
-- `.\mvnw.cmd test` — passed, 41 tests, 0 failures/errors/skips.
-- `.\mvnw.cmd compile` — passed.
-- `npm run lint` — passed.
-- `npm run build` — passed.
-- `GET /actuator/health` — HTTP 200 with `{"status":"UP"}` from a running H2-backed Spring Boot process; this is not a MySQL health check.
-- Flyway V1–V3 on MySQL — not run. MySQL port reachability alone is not a connection or migration test.
-- Browser smoke — Playwright confirmed the login and registration pages render, empty login submission is blocked by browser validation, unauthenticated `/accounts` redirects to `/login`, and registration remains public after refresh. Auth API operations and role-specific sessions were not testable without MySQL credentials.
+- Backend test/package counts and frontend build/lint/test results are recorded in [DAY3_DAY7_PROGRESS.md](./DAY3_DAY7_PROGRESS.md) after the latest run.
+- H2 tests explicitly disable Flyway; they cover business/API behavior but not MySQL migration execution.
+- MySQL V1-V4, Hibernate validation and MySQL health are **BLOCKED** until a verified empty disposable database and local credentials are available.
+- Authenticated browser login/register and role-specific UI interactions are **PARTIAL** until a real backend is available; no mocked API success is claimed.
 
 ## Known limitations and next work
 
-1. Apply V1 through V3 on MySQL 8.0.16+ and confirm Hibernate validation plus a live health request.
-2. Provision the first ADMIN through the gated bootstrap only in the intended environment; disable and clear its credentials afterward. Add a role-aware admin UI.
-3. Implement transaction/statement APIs only after their service, ledger, concurrency, idempotency, and audit invariants are specified and tested.
-4. Add account and transaction service integration tests against MySQL; retain account permission checks on every new account-scoped operation.
-5. Before any money movement: design and independently test transaction-bound balance updates, paired ledger postings, user-scoped idempotency, rollback, concurrency, and audit controls. Do not enable transfers before these checks pass.
-6. Add rate limiting/lockout controls, MFA, password reset/email verification, secret rotation/management, HTTPS/security headers, and operational monitoring.
+1. Verify and migrate a new empty disposable `ledgerline_db` with V1-V4, inspect triggers/history, then validate Hibernate and MySQL health.
+2. Run authenticated browser workflows against that backend with disposable users for each role.
+3. Before any real-fund use: independently review posting semantics, settlement operations, opening balance reconciliation, MySQL isolation, backup/recovery, database privileges, audit monitoring and regulatory requirements.
+4. Add rate limiting, MFA, password recovery/email verification, key rotation, HTTPS/security headers, operational monitoring and external tamper evidence.
 
-See [THREATS.md](./THREATS.md) for current risks and [PROMPTS.md](./PROMPTS.md) for the dated AI-assisted development record.
+See [DAY3_DAY7_PROGRESS.md](./DAY3_DAY7_PROGRESS.md), [documentation/API.md](./documentation/API.md), [documentation/DATABASE_AND_ARCHITECTURE.md](./documentation/DATABASE_AND_ARCHITECTURE.md), [documentation/DEMO.md](./documentation/DEMO.md), [THREATS.md](./THREATS.md) and [PROMPTS.md](./PROMPTS.md).

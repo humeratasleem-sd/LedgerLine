@@ -264,3 +264,53 @@ Final status is based on the completed source review and the checks listed below
 3. Configure and run the backend against the disposable MySQL DB and valid JWT key, then run browser registration/login, invalid credentials, profile, role-specific sessions, logout, refresh, and actual 401/403 checks using real users/API responses.
 4. If the intended deployment needs an initial admin, provide the operator-managed bootstrap credentials, run once, then set the enable flag false/remove it and delete the credential values from the deployment secret store before restart.
 5. Add role-aware admin UI and future transaction/statement capabilities only after defining and testing financial integrity, idempotency, rollback, and concurrency invariants. Day 3 and money movement were not implemented.
+
+## Re-verification — 2026-11-08
+
+This section records a fresh verification after the preceding audit. It supersedes no historical results above; it states what was rechecked in this session and the current gate decision.
+
+### Results
+
+| Area | Result | Evidence |
+|---|---|---|
+| Backend tests | PASS | `.\mvnw.cmd test` passed: 41 tests, 0 failures, 0 errors, 0 skipped. The suite uses H2 and disables Flyway in its integration context. |
+| Maven build | PASS | `.\mvnw.cmd package` completed with `BUILD SUCCESS`; it also ran the 41-test suite. |
+| Frontend lint | PASS | `npm run lint` completed successfully. |
+| Frontend production build | PASS | `npm run build` completed successfully with Vite 8.3.6. |
+| Registration, login, JWT, protected API, role access, account permissions, admin operations, auditor read-only | PASS in automated backend tests | `AuthorizationEndpointTest`, `AuthServiceTest`, `JwtConfigTest`, `SecurityConfigTest`, `AccountAuthorizationServiceTest`, and bootstrap tests cover registration/validation, login, valid/expired/invalid JWTs, current-user lookup, role enforcement, account scope, admin actions, and auditor write denial. This is H2/API evidence, not MySQL evidence. |
+| Browser guest-route checks | PASS for checked behavior only | Ran the local Vite application and confirmed unauthenticated `/accounts`, `/audit`, `/transfers`, `/statements`, and `/profile` each redirect to `/login`. |
+| Authenticated browser flows | PARTIAL | No real registration/login, authenticated route, role-specific navigation, logout, or browser 401/403 flow was attempted; there was no MySQL-backed API to use. |
+| MySQL connectivity and Flyway V1-V3 | PARTIAL / NOT RUN | Checked the actual `LEDGERLINE_DB_URL`, `LEDGERLINE_DB_USERNAME`, `LEDGERLINE_DB_PASSWORD`, and `LEDGERLINE_JWT_SECRET_BASE64` process environment entries without displaying values; all were unset. Root and backend `.env` files were absent. `.env.example` contains placeholders only. No database login or migration was attempted. |
+| Hibernate schema validation and MySQL-backed health | PARTIAL / NOT RUN | These require a successfully migrated, verified disposable MySQL database. Neither was started or claimed. |
+
+### Current Day 2 decision
+
+**Day 2: PARTIAL — not officially verified as complete.** The 58 PASS / 0 FAIL / 9 PARTIAL checklist counts above remain the current source-audited totals. The remaining partial items are D2-41, D2-42, D2-44 through D2-49 (authenticated/browser behavior), and D2-53 (MySQL migrations). Most importantly, actual MySQL connectivity, V1-V3 execution, and Hibernate validation remain unverified. The backend test database is H2 and does not satisfy those requirements.
+
+No evidence here supports changing any database item to PASS. No database was contacted or modified. The schema and migration files were inspected statically; this is not execution evidence. Code-level authentication and authorization tests passed, but they do not close the database gate.
+
+### Day 3 gate
+
+**Day 3 was not started.** The critical database requirement remains PARTIAL, and the requested condition to begin Day 3 was therefore not met. No money transfers or withdrawals were implemented. No standalone original seven-day plan with exact Day 3 requirements was found in the repository documentation inspected; the plan must be located before a later Day 3 implementation.
+
+### Git and next verification
+
+The worktree was clean on branch `main` before this audit update. No commit was created. This audit update is the only intended repository change for this verification.
+
+To clear the database blocker, configure credentials in the local process environment for a newly created, verified-empty disposable `ledgerline_db` using a restricted user. Do not send credentials in chat or use an existing/production database. Then run the application against only that disposable schema, verify Flyway history V1-V3, confirm Hibernate schema validation and `/actuator/health`, and perform authenticated browser flows with real disposable test users. Until those checks pass, retain the PARTIAL status and do not claim Day 2 completion.
+
+## Follow-up verification — 2026-11-08
+
+This follow-up is for the later request to complete the existing project through Day 7. It supersedes the earlier "Day 3 was not started" statement only as to source implementation: Days 3-7 were implemented under the later instruction, but Day 1/2's database and authenticated-browser gaps remain open.
+
+| Area | Result | Evidence |
+|---|---|---|
+| Backend tests and Maven package | PASS | `.\backend\ledgerline\mvnw.cmd -f backend\ledgerline\pom.xml package`: `BUILD SUCCESS`, 49 tests, 0 failures/errors/skips. Integration tests use H2 and disable Flyway. |
+| Frontend tests | PASS | Latest `npm test`: 4 tests, 0 failures, including large integer paise formatting and same-key transfer retry behavior. |
+| Frontend lint and production build | PASS | `npm run lint` and `npm run build` both succeeded (Vite 8.3.6). |
+| Guest browser behavior | PASS for checked routes | Local Vite login and registration rendered; `/accounts`, `/audit`, `/transfers`, `/statements`, and `/profile` redirected to `/login`; `/register` remained public. |
+| Authenticated browser registration/login, JWT and role navigation | PARTIAL | No API/database credentials were configured. No authenticated browser flow or live API request was claimed. |
+| MySQL connection, Flyway V1-V4, Hibernate validation, MySQL health | BLOCKED / NOT RUN | Checked process environment variable presence without displaying values; database URL, username, password and JWT secret were unset. No database was contacted or modified, and no migration was run. |
+| Ledger/idempotency/rollback/concurrency tests | PASS on H2 only | `FinancialTransactionIntegrationTest` passed 8 cases including duplicate/mismatched idempotency, insufficient funds, unauthorized source, auditor read-only, concurrent withdrawals, rollback, external reference collision and admin lifecycle. These do not prove MySQL behavior. |
+
+Day 2 remains **PARTIAL**, not officially database-verified. Days 3-7 have source implementation and H2/test evidence as summarized in `DAY3_DAY7_PROGRESS.md`; they are not production-ready or MySQL-certified. The original seven-day schedule was not found, so the progress document explicitly labels its schedule as reconstructed. No MySQL credentials were requested or exposed.

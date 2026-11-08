@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
 import AuthPage from './components/AuthPage.jsx'
+import { getAuthErrorMessage } from '../utils/authErrors.js'
 
 function Login() {
   const { login } = useAuth()
@@ -20,7 +21,7 @@ function Login() {
       await login(email, password)
       navigate(location.state?.from || '/', { replace: true })
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to sign in. Check your details and try again.')
+      setError(getAuthErrorMessage(requestError, 'login'))
     } finally {
       setSubmitting(false)
     }

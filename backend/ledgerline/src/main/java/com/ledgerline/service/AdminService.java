@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.ledgerline.dto.AccountPermissionRequest;
+import com.ledgerline.dto.AccountLifecycleRequest;
 import com.ledgerline.dto.AccountStatusRequest;
 import com.ledgerline.dto.AccountResponse;
 import com.ledgerline.dto.AuthenticatedUserResponse;
@@ -11,10 +12,12 @@ import com.ledgerline.dto.CreateAccountRequest;
 import com.ledgerline.dto.UserRoleRequest;
 import com.ledgerline.entity.User;
 import com.ledgerline.enums.AccountStatus;
+import com.ledgerline.enums.AccountLifecycleStatus;
 import com.ledgerline.enums.Role;
 import com.ledgerline.exception.ResourceConflictException;
 import com.ledgerline.exception.ResourceNotFoundException;
 import com.ledgerline.repository.UserRepository;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -28,14 +31,22 @@ public class AdminService {
     private final JdbcTemplate jdbcTemplate;
     private final UserRepository userRepository;
     private final AccountAuthorizationService accountAuthorizationService;
+    private final AccountService accountService;
 
     public AdminService(
             JdbcTemplate jdbcTemplate,
             UserRepository userRepository,
-            AccountAuthorizationService accountAuthorizationService) {
+            AccountAuthorizationService accountAuthorizationService,
+            AccountService accountService) {
         this.jdbcTemplate = jdbcTemplate;
         this.userRepository = userRepository;
         this.accountAuthorizationService = accountAuthorizationService;
+        this.accountService = accountService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountResponse> listAccounts() {
+        return accountService.listAllAccounts();
     }
 
     @Transactional(readOnly = true)
@@ -67,15 +78,19 @@ public class AdminService {
         }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            var statement = connection.prepareStatement("""
-                    INSERT INTO accounts (account_number, currency, balance_paise, status)
-                    VALUES (?, ?, 0, 'ACTIVE')
-                    """, new String[] {"id"});
-            statement.setString(1, request.accountNumber());
-            statement.setString(2, request.currency());
-            return statement;
-        }, keyHolder);
+        try {
+            jdbcTemplate.update(connection -> {
+                var statement = connection.prepareStatement("""
+                        INSERT INTO accounts (account_number, currency, balance_paise, status)
+                        VALUES (?, ?, 0, 'ACTIVE')
+                        """, new String[] {"id"});
+                statement.setString(1, request.accountNumber());
+                statement.setString(2, request.currency());
+                return statement;
+            }, keyHolder);
+        } catch (DuplicateKeyException exception) {
+            throw new ResourceConflictException("An account with this account number already exists.");
+        }
         Number generatedId = keyHolder.getKey();
         if (generatedId == null) {
             throw new IllegalStateException("The database did not return the new account ID.");
@@ -92,7 +107,37 @@ public class AdminService {
                 java.sql.Timestamp.class,
                 accountId).toInstant();
         return new AccountResponse(
-                accountId, request.accountNumber(), request.currency(), "0", "ACTIVE", createdAt);
+                accountId, request.accountNumber(), request.currency(), "0", "ACTIVE", createdAt, "OWNER");
+    }
+
+    @Transactional
+    public void updateAccountLifecycle(
+            Authentication actor, long accountId, AccountLifecycleRequest request) {
+        long actorId = accountAuthorizationService.authenticatedUserId(actor);
+        var current = jdbcTemplate.query("""
+                SELECT status, balance_paise
+                FROM accounts
+                WHERE id = ?
+                FOR UPDATE
+                """, resultSet -> resultSet.next()
+                ? new AccountLifecycleState(
+                        resultSet.getString("status"), resultSet.getLong("balance_paise"))
+                : null, accountId);
+        if (current == null) {
+            throw new ResourceNotFoundException("Account not found.");
+        }
+        String requestedStatus = request.status().name();
+        if (current.status().equals(requestedStatus)) {
+            return;
+        }
+        if (current.status().equals(AccountLifecycleStatus.CLOSED.name())) {
+            throw new ResourceConflictException("A closed account cannot be reopened or changed.");
+        }
+        if (request.status() == AccountLifecycleStatus.CLOSED && current.balancePaise() != 0) {
+            throw new ResourceConflictException("An account must have a zero balance before it can be closed.");
+        }
+        jdbcTemplate.update("UPDATE accounts SET status = ? WHERE id = ?", requestedStatus, accountId);
+        recordAdminAction(actorId, "ACCOUNT_STATUS_CHANGED", "ACCOUNT", Long.toString(accountId));
     }
 
     @Transactional
@@ -100,14 +145,14 @@ public class AdminService {
             Authentication actor, long accountId, AccountPermissionRequest request) {
         long actorId = accountAuthorizationService.authenticatedUserId(actor);
         ensureActiveUser(request.userId());
-        ensureAccountExists(accountId);
+        lockAccount(accountId);
 
         int updated = jdbcTemplate.update("""
                 UPDATE account_permissions
                 SET permission = ?
                 WHERE account_id = ? AND user_id = ?
                 """, request.permission().name(), accountId, request.userId());
-        if (updated == 0) {
+        if (updated == 0 && !permissionExists(accountId, request.userId())) {
             jdbcTemplate.update("""
                     INSERT INTO account_permissions (account_id, user_id, permission)
                     VALUES (?, ?, ?)
@@ -177,12 +222,26 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Active user not found."));
     }
 
-    private void ensureAccountExists(long accountId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM accounts WHERE id = ?", Integer.class, accountId);
-        if (count == null || count == 0) {
+    private void lockAccount(long accountId) {
+        Long lockedId = jdbcTemplate.query("""
+                SELECT id
+                FROM accounts
+                WHERE id = ?
+                FOR UPDATE
+                """, resultSet -> resultSet.next() ? resultSet.getLong("id") : null, accountId);
+        if (lockedId == null) {
             throw new ResourceNotFoundException("Account not found.");
         }
+
+    }
+
+    private boolean permissionExists(long accountId, long userId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM account_permissions
+                WHERE account_id = ? AND user_id = ?
+                """, Integer.class, accountId, userId);
+        return count != null && count > 0;
     }
 
     private void recordAdminAction(long actorId, String action, String entityType, String entityId) {
@@ -190,5 +249,8 @@ public class AdminService {
                 INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id)
                 VALUES (?, ?, ?, ?)
                 """, actorId, action, entityType, entityId);
+    }
+
+    private record AccountLifecycleState(String status, long balancePaise) {
     }
 }

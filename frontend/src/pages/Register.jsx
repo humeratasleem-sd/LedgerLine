@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
 import AuthPage from './components/AuthPage.jsx'
+import { getAuthErrorMessage } from '../utils/authErrors.js'
 
 function Register() {
   const { register } = useAuth()
@@ -20,7 +21,7 @@ function Register() {
       await register(fullName, email, password)
       navigate('/', { replace: true })
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to create your account. Please try again.')
+      setError(getAuthErrorMessage(requestError, 'register'))
     } finally {
       setSubmitting(false)
     }

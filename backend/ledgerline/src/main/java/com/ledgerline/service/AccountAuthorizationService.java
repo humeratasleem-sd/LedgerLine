@@ -26,6 +26,9 @@ public class AccountAuthorizationService {
     }
 
     public boolean canViewAccount(Authentication authentication, long accountId) {
+        if (hasRole(authentication, "ADMIN") || hasRole(authentication, "AUDITOR")) {
+            return true;
+        }
         return hasPermission(authentication, accountId, List.of(
                 AccountPermission.OWNER, AccountPermission.VIEW, AccountPermission.TRANSFER));
     }
@@ -56,6 +59,20 @@ public class AccountAuthorizationService {
         } catch (NumberFormatException exception) {
             throw new AccessDeniedException("Account access denied.");
         }
+    }
+
+    public boolean isAuditor(Authentication authentication) {
+        return hasRole(authentication, "AUDITOR");
+    }
+
+    public boolean isAdministrator(Authentication authentication) {
+        return hasRole(authentication, "ADMIN");
+    }
+
+    private static boolean hasRole(Authentication authentication, String role) {
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                        .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 
     private boolean hasPermission(

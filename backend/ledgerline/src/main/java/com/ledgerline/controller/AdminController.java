@@ -3,6 +3,7 @@ package com.ledgerline.controller;
 import java.util.List;
 
 import com.ledgerline.dto.AccountPermissionRequest;
+import com.ledgerline.dto.AccountLifecycleRequest;
 import com.ledgerline.dto.AccountResponse;
 import com.ledgerline.dto.AccountStatusRequest;
 import com.ledgerline.dto.AuthenticatedUserResponse;
@@ -37,6 +38,20 @@ public class AdminController {
     @GetMapping("/users")
     public List<AuthenticatedUserResponse> listUsers() {
         return adminService.listUsers();
+    }
+
+    @GetMapping("/accounts")
+    public List<AccountResponse> listAccounts() {
+        return adminService.listAccounts();
+    }
+
+    @PatchMapping("/accounts/{accountId}/status")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateAccountStatus(
+            Authentication authentication,
+            @PathVariable long accountId,
+            @Valid @RequestBody AccountLifecycleRequest request) {
+        adminService.updateAccountLifecycle(authentication, accountId, request);
     }
 
     @PatchMapping("/users/{userId}/status")

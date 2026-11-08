@@ -1,5 +1,6 @@
 import {
   Activity,
+  BriefcaseBusiness,
   ArrowLeftRight,
   BadgeCheck,
   FileText,
@@ -18,6 +19,7 @@ const navigation = [
   { label: 'Transfers', path: '/transfers', icon: ArrowLeftRight, roles: ['ACCOUNT_HOLDER'] },
   { label: 'Statements', path: '/statements', icon: FileText, roles: ['ADMIN', 'ACCOUNT_HOLDER', 'AUDITOR'] },
   { label: 'Audit trail', path: '/audit', icon: BadgeCheck, roles: ['ADMIN', 'AUDITOR'] },
+  { label: 'Admin', path: '/admin', icon: BriefcaseBusiness, roles: ['ADMIN'] },
 ]
 
 const pageNames = {
@@ -26,6 +28,7 @@ const pageNames = {
   '/transfers': 'Transfers',
   '/statements': 'Statements',
   '/audit': 'Audit trail',
+  '/admin': 'Administration',
   '/profile': 'My profile',
 }
 

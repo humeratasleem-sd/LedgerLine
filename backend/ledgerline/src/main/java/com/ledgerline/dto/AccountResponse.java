@@ -8,5 +8,6 @@ public record AccountResponse(
         String currency,
         String balancePaise,
         String status,
-        Instant createdAt) {
+        Instant createdAt,
+        String permission) {
 }

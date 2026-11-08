@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthContext.jsx'
 import { ProtectedRoute, PublicOnlyRoute, RoleRoute } from './auth/ProtectedRoute.jsx'
 import AppShell from './components/AppShell.jsx'
 import Accounts from './pages/Accounts.jsx'
+import Admin from './pages/Admin.jsx'
 import Audit from './pages/Audit.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Login from './pages/Login.jsx'
@@ -22,6 +23,9 @@ function App() {
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
+              <Route element={<RoleRoute roles={['ADMIN']} />}>
+                <Route path="admin" element={<Admin />} />
+              </Route>
               <Route path="statements" element={<Statements />} />
               <Route path="profile" element={<Profile />} />
               <Route element={<RoleRoute roles={['ACCOUNT_HOLDER']} />}>
